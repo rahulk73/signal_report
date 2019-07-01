@@ -11,6 +11,7 @@ import threading
 w=800
 h=500
 
+
 class MainApplication(tk.Frame):
     def __init__(self,parent):
         tk.Frame.__init__(self,parent)
@@ -67,7 +68,7 @@ class MainApplication(tk.Frame):
         
     def setup(self):
         self.tdate=calendar.datetime.date.today()
-        self.fdate=calendar.datetime.date(self.tdate.year,self.tdate.month,self.tdate.day-2)
+        self.fdate=calendar.datetime.date(self.tdate.year,self.tdate.month,self.tdate.day)+datetime.timedelta(days=-2)
         self.photoimage=tk.PhotoImage(file="C:\\Users\\OISM\\Desktop\\sqlApp\\bgimage.png")
         self.parent.geometry("%dx%d" % (w,h))
         self.parent.title("Create Exel Log File")
