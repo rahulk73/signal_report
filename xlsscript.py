@@ -18,8 +18,14 @@ def main(fdate,tdate,fq,radb,hidden,object_fullpath):
         workbook = xlsxwriter.Workbook('./SignalLog/tables.xlsx')
         worksheet = workbook.add_worksheet()
         cell_format=workbook.add_format({'font_color':'white','bg_color':'#107896',\
-    'font_name':'Times New Roman','bold':True,'underline':True,'center_across':True,'font_size':20})
+    'font_name':'Times New Roman','bold':True,'underline':True,'center_across':True,'font_size':20})  
+        caption = 'LOGS'
+        worksheet.set_column('B:G', 20)
+        worksheet.write('D1', caption,cell_format)
         unparsed_data=sqlscript.main(object_fullpath)
+        if not unparsed_data:
+            workbook.close()
+            return -3
         data=[]
     
         if not hidden:
@@ -53,11 +59,8 @@ def main(fdate,tdate,fq,radb,hidden,object_fullpath):
             for vm,vo,dt,ms,vq,vv in unparsed_data:
                 if(dt>=fdate and dt<(tdate+datetime.timedelta(1))):
                     data.append((str(dt.date()),str(addSecs(dt.time(),ms)),vm,vo,vq,vv))
-
-        caption = 'LOGS'
-        worksheet.set_column('B:G', 20)
-        worksheet.write('D1', caption,cell_format)
-        options = {'banded_rows': 0, 'banded_columns': 1,'data': data,
+        if data:
+            options = {'banded_rows': 0, 'banded_columns': 1,'data': data,
                 'columns': [{'header':'Date'},
                             {'header': 'Time'},
                             {'header': 'Value Meantype'},
@@ -65,7 +68,6 @@ def main(fdate,tdate,fq,radb,hidden,object_fullpath):
                             {'header': 'Value Quality'},
                             {'header': 'Value Value'},
                             ]} 
-        if data:
             worksheet.add_table('B3:G'+str(3+len(data)),options)
         workbook.close()
         return int(not data==[])
@@ -73,5 +75,5 @@ def main(fdate,tdate,fq,radb,hidden,object_fullpath):
         return -1
 
 if __name__ == "__main__":
-  main(datetime.datetime(2019,5,28),datetime.datetime(2019,5,30),2,1,False,'MOSG / 33KV / H03_CABLEFDR-H16 / MEASUREMENT / VOLTAGE VRN')
+  main(datetime.datetime(2019,5,28),datetime.datetime(2019,5,30),2,1,True,'MOSG / 33KV / H38_39 BUS SEC / BUSBAR PROT')
  
