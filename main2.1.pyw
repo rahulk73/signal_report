@@ -16,33 +16,19 @@ class MainApplication(tk.Frame):
     def __init__(self,parent):
         tk.Frame.__init__(self,parent)
         self.parent=parent
-        self.setup()
-        self.cv=tk.Canvas(parent,height=h,width=w,bg='blue')
+        self.cv=tk.Canvas(parent,height=h,width=w)
         self.cv.pack(side='top',fill='both',expand='yes')
+        self.setup()
         self.cv.create_image(0,0,image=self.photoimage,anchor='nw')
         self.cv.create_text(15,20,text="Time Period :",fill='white',anchor='nw',font=("Arial", 12, "bold"))
-        self.fbutton=ttk.Button(self.cv, text='From', command=self.fgetdate,underline=1)
         self.fbutton.place(x=150,y=20)
-        self.tbutton=ttk.Button(self.cv, text='To', command=self.tgetdate)
         self.tbutton.place(x=250,y=20)
-        self.tbutton.config(state='disabled')
-        self.flabel=tk.Label(parent,textvariable=self.fstr,width=10)
         self.flabel.place(x=150,y=45)
-        self.tlabel=tk.Label(parent,textvariable=self.tstr,width=10)
         self.tlabel.place(x=250,y=45)
-        self.advanbutton=tk.Button(self.parent,textvariable=self.btn_text,command=self.advance)
         self.advanbutton.place(x=350,y=25)
-        self.pentry=tk.Entry(parent)
-        self.pentry.config(fg='grey')
-        self.pentry.insert(0,self.default_text)
-        self.pentry.bind('<FocusIn>',self.in_focus)
-        self.pentry.bind('<FocusOut>',self.out_focus)
         self.cv.create_text(15,90,text="Object Path: ",fill='white',anchor='nw',font=("Arial", 12, "bold"))
         self.pentry.place(x=150,y=90,width=370)
-        self.cbutton=tk.Button(parent,text="Create excel File!",command=self.extract)
         self.cbutton.place(x=200,y=240)
-        self.progress = ttk.Progressbar(parent, orient=tk.HORIZONTAL,length=100,  mode='indeterminate')
-
     def extract(self):
         def thread_extract():
             self.progress.place(x=200,y=300)
@@ -59,8 +45,10 @@ class MainApplication(tk.Frame):
                 tk.messagebox.showerror("Error","Close the excel file and try again.")
             if found==-2:
                 tk.messagebox.showerror("Error","Something went wrong. Restart the application and try again.")
+            elif found==-3:
+                tk.messagebox.showwarning("Info","No data was found for the signal.")
             elif found==0:
-                tk.messagebox.showwarning("Info","No data was found in the selected time period.")
+                tk.messagebox.showwarning("Info","No data was found for the signal in the selected time period.")
             elif found:
                 tk.messagebox.showinfo("Extraction Successful !","You can view the records in the file tables.xlsx")
         self.disable_all()        
@@ -69,19 +57,32 @@ class MainApplication(tk.Frame):
     def setup(self):
         self.tdate=calendar.datetime.date.today()
         self.fdate=calendar.datetime.date(self.tdate.year,self.tdate.month,self.tdate.day)+datetime.timedelta(days=-2)
+        self.fbutton=ttk.Button(self.parent, text='From', command=self.fgetdate,underline=1)
+        self.tbutton=ttk.Button(self.parent, text='To', command=self.tgetdate)
+        self.tbutton.config(state='disabled')
+        self.fstr=tk.StringVar(self.parent,self.date_format(self.fdate))
+        self.flabel=tk.Label(self.parent,textvariable=self.fstr,width=10)
+        self.tstr=tk.StringVar(self.parent,self.date_format(self.tdate))
+        self.tlabel=tk.Label(self.parent,textvariable=self.tstr,width=10)
         self.photoimage=tk.PhotoImage(file="C:\\Users\\OISM\\Desktop\\sqlApp\\bgimage.png")
         self.parent.geometry("%dx%d" % (w,h))
         self.parent.title("Create Exel Log File")
         self.btn_text=tk.StringVar(self.parent,value="Show Advanced Options")
+        self.advanbutton=tk.Button(self.parent,textvariable=self.btn_text,command=self.advance)
+        self.hidden=True
         self.fqvar=tk.StringVar(self.parent,value='1')
         self.fqvar.trace('w',self.update)
         self.radb=tk.IntVar(self.parent,2)
         self.flag=tk.IntVar(self.parent,0)
         self.flag.trace('w',self.callback)
-        self.fstr=tk.StringVar(self.parent,self.date_format(self.fdate))
-        self.tstr=tk.StringVar(self.parent,self.date_format(self.tdate))
         self.default_text='MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN'
-        self.hidden=True
+        self.pentry=tk.Entry(self.parent)
+        self.pentry.config(fg='grey')
+        self.pentry.insert(0,self.default_text)
+        self.pentry.bind('<FocusIn>',self.in_focus)
+        self.pentry.bind('<FocusOut>',self.out_focus)
+        self.cbutton=tk.Button(self.parent,text="Create excel File!",command=self.extract)
+        self.progress = ttk.Progressbar(self.parent, orient=tk.HORIZONTAL,length=100,  mode='indeterminate')
     def fgetdate(self):
         def print_sel():
             if self.cal.selection_get()<calendar.datetime.date.today():
