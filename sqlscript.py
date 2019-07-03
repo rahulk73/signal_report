@@ -49,7 +49,7 @@ class GetSignals:
         self.connection=pymysql.connect(host='localhost',user='mcisadmin',password='s$e!P!C!L@2014',db='pacis')
         try:
             with self.connection.cursor() as cursor:
-                self.sql="SELECT object_fullpath FROM objects"
+                self.sql="SELECT object_fullpath FROM objects order by object_fullpath"
                 cursor.execute(self.sql)
                 cursor.fetchmany()
                 self.result=cursor.fetchall()
