@@ -6,11 +6,23 @@ Credits:
 Icon made by VisualPharm at icon-icons.com/icon/database-the-application/2803 (License : CC Attribution)
 """
 from tkcalendar import *
-import xlsscript
+from xlsscript import ParseData
 import threading
+from os import system
 w=800
-h=500
+h=800
 
+class Navbar(tk.Frame):
+    def __init__(self,parent):
+        tk.Frame.__init__(self,parent)
+        self.parent=parent
+        self.internal_nodes = dict()
+        self.tree = ttk.Treeview(self)
+        ysb = ttk.Scrollbar(self, orient='vertical', command=self.tree.yview)
+        xsb = ttk.Scrollbar(self, orient='horizontal', command=self.tree.xview)
+        self.tree.configure(yscroll=ysb.set, xscroll=xsb.set)
+        self.tree.heading('#0', text='Signal tree', anchor='w')
+        self.tree.grid(ipadx=150,ipady=150,sticky='e')
 
 class MainApplication(tk.Frame):
     def __init__(self,parent):
@@ -35,9 +47,9 @@ class MainApplication(tk.Frame):
             self.progress.start()
             self.object_fullpath=self.pentry.get()
             if self.hidden:
-                found=xlsscript.main(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day),0,0,self.hidden,self.object_fullpath.upper())
+                found=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day),0,0,self.hidden,self.object_fullpath.upper()).result
             else:
-                found=xlsscript.main(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day),self.fqentry.get(),self.radb.get(),self.hidden,self.object_fullpath.upper())       
+                found=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day),self.fqentry.get(),self.radb.get(),self.hidden,self.object_fullpath.upper()).result       
             self.progress.stop()
             self.progress.place_forget()
             self.enable_all()
@@ -49,8 +61,9 @@ class MainApplication(tk.Frame):
                 tk.messagebox.showwarning("Info","No data was found for the signal.")
             elif found==0:
                 tk.messagebox.showwarning("Info","No data was found for the signal in the selected time period.")
-            elif found:
+            elif found==1:
                 tk.messagebox.showinfo("Extraction Successful !","You can view the records in the file tables.xlsx")
+                system('start EXCEL.EXE ./SignalLog/tables.xlsx')
         self.disable_all()        
         threading.Thread(target=thread_extract).start()
         
