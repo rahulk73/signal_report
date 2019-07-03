@@ -1,36 +1,25 @@
-import pymysql.cursors
-def get_data():
-    result=()
-    connection=pymysql.connect(host='localhost',user='mcisadmin',password='s$e!P!C!L@2014',db='pacis')
-    try:
-        with connection.cursor() as cursor:
-            sql="SELECT object_fullpath FROM objects"
-            cursor.execute(sql)
-            cursor.fetchmany()
-            result=cursor.fetchall()
-    except Exception as e:
-        print(e)
-        return -2
-    finally:
-        connection.close()
-        return result
+from sqlscript import GetSignals
 class Node:
     def __init__(self,data,parent=None):
         self.data=data
         self.children=[]
         if parent:
             parent.children.append(self)
-    def getChildren(self):
+    def getChildrenData(self):
         child_names=[]
         for child in self.children:
             child_names.append(child.data)
         return child_names
+    def getChildren(self):
+        return [child for child in self.children]
     def findChild(self,data):
         for child in self.children:
             if data==child.data:
                 return child
     def isLeaf(self):
         return self.children==[]
+    def isInternalNode(self):
+        return not self.children==[]
     def __str__(self):
         return ', '.join([child.data for child in self.children])
  
@@ -41,12 +30,13 @@ class Tree:
             next_parent=self.root
             data_split=data[0].split(' / ')
             for node_val in data_split:
-                if node_val not in next_parent.getChildren():
+                if node_val not in next_parent.getChildrenData():
                     next_parent=Node(node_val,parent=next_parent)
                 else:
                     next_parent=next_parent.findChild(node_val)
     def getRoot(self):
         return self.root
 if __name__ == "__main__":
-    tree=Tree(get_data())
+    signals=GetSignals()
+    tree=Tree(signals.result)
     print(tree.getRoot())
