@@ -7,6 +7,8 @@ Icon made by VisualPharm at icon-icons.com/icon/database-the-application/2803 (L
 """
 from tkcalendar import *
 from xlsscript import ParseData
+from sqlscript import GetSignals
+from signaltree import Tree,Node
 import threading
 from os import system
 w=800
@@ -23,6 +25,23 @@ class Navbar(tk.Frame):
         self.tree.configure(yscroll=ysb.set, xscroll=xsb.set)
         self.tree.heading('#0', text='Signal tree', anchor='w')
         self.tree.grid(ipadx=150,ipady=150,sticky='e')
+        ysb.grid(row=0, column=1, sticky='ns')
+        xsb.grid(row=1, column=0, sticky='ew')
+        self.layout=Tree(GetSignals().result)
+        self.insert_node('', self.layout.root,self.layout.root.data)
+        self.tree.bind('<<TreeviewOpen>>', self.open_node)
+    def insert_node(self, parent_iid, node,text):
+        node_iid = self.tree.insert(parent_iid, 'end', text=text, open=False)
+        if node.isInternalNode():
+            self.internal_nodes[node_iid] = node
+            self.tree.insert(node_iid, 'end')
+    def open_node(self, event):
+        node_iid = self.tree.focus()  
+        node = self.internal_nodes.pop(node_iid, None)
+        if node:
+            self.tree.delete(self.tree.get_children(node_iid))
+            for node_child in node.getChildren():
+                self.insert_node(node_iid,node_child, node_child.data)
 
 class MainApplication(tk.Frame):
     def __init__(self,parent):
@@ -31,6 +50,8 @@ class MainApplication(tk.Frame):
         self.cv=tk.Canvas(parent,height=h,width=w)
         self.cv.pack(side='top',fill='both',expand='yes')
         self.setup()
+        self.navbar=Navbar(parent)
+        self.navbar.place(x=200,y=350)
         self.cv.create_image(0,0,image=self.photoimage,anchor='nw')
         self.cv.create_text(15,20,text="Time Period :",fill='white',anchor='nw',font=("Arial", 12, "bold"))
         self.fbutton.place(x=150,y=20)
