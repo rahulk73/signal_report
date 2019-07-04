@@ -3,7 +3,7 @@ import datetime
 from sqlscript import GetSignalData
 
 class ParseData:
-    def __init__(self,fdate,tdate,fq,radb,hidden,object_fullpath):
+    def __init__(self,fdate,tdate,fq,radb,hidden,object_fullpath,signal_type):
         try:    
             self.workbook = xlsxwriter.Workbook('./SignalLog/tables.xlsx')
             self.worksheet = self.workbook.add_worksheet()
@@ -12,7 +12,7 @@ class ParseData:
             caption = 'LOGS'
             self.worksheet.set_column('B:G', 20)
             self.worksheet.write('D1', caption,cell_format)
-            self.signaldata=GetSignalData(object_fullpath)
+            self.signaldata=GetSignalData(object_fullpath,signal_type)
             self.unparsed_data=self.signaldata.result
             self.uid=self.signaldata.uid
             if not self.unparsed_data:
@@ -81,5 +81,6 @@ class ParseData:
 
 
 if __name__ == "__main__":
-  ParseData(datetime.datetime(2019,5,28),datetime.datetime(2019,5,30),2,1,False,'MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN')
+  a=ParseData(datetime.datetime(2019,5,28),datetime.datetime(2019,5,30),2,1,False,'MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
+  print(a.result)
  

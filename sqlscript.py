@@ -2,8 +2,16 @@ import pymysql.cursors
 import datetime
 import re
 from subprocess import run
+def generator(cursor,size=100):
+    while True:
+        rows=cursor.fetchmany(size)
+        if not rows:
+            break
+        for row in rows:
+            yield row
 class GetSignalData:
-    def __init__(self,object_fullpath):
+    def __init__(self,object_fullpath,signal_type):
+        self.option={'All Signals':1,'All Controls':0}[signal_type]
         self.result=()
         self.connection=pymysql.connect(host='localhost',user='mcisadmin',password='s$e!P!C!L@2014',db='pacis')
         try:
@@ -11,7 +19,16 @@ class GetSignalData:
                 self.sql="select * from objects where object_fullpath='{}'".format(object_fullpath)
                 cursor.execute(self.sql)
                 self.result=cursor.fetchall()
-                self.uid=self.result[0][1]
+                for row in self.result:
+                    if row[42]:
+                        schar=row[42][-1]
+                        if schar != 'c' and self.option == 1:
+                            break
+                        elif schar == 'c' and self.option == 0:
+                            break
+                    elif self.option==1:
+                        break
+                self.uid=row[1]
                 if self.result:
                     run("mysqldump -u mcisadmin -ps$e!P!C!L@2014 pacis > pacis.sql",shell=True)
                     self.all_tables=self.get_tables(self.uid)
@@ -19,7 +36,8 @@ class GetSignalData:
                     if self.all_tables:
                         self.sql="SELECT * FROM "+','.join(self.all_tables)
                         cursor.execute(self.sql)
-                        self.result = cursor.fetchall()
+                        self.result=generator(cursor)
+                        #self.result = cursor.fetchall()
                     else: 
                         self.result = 0
         except Exception as e:
@@ -43,6 +61,7 @@ class GetSignalData:
             self.file.close()
             return self.all_tables
 
+
 class GetSignals:
     def __init__(self):
         self.result=()
@@ -60,6 +79,7 @@ class GetSignals:
 
 
 if __name__ == "__main__":
-    data=GetSignalData('MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN')
+   # data=GetSignalData('MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
+    data=GetSignalData('MOSG / 33KV / H06_T10 (LV) INC / CONTROL MODE / CONTROL MODE','All Controls')
     print(data.result[0])
 
