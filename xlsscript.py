@@ -1,7 +1,8 @@
 import xlsxwriter
 import datetime
 from sqlscript import GetSignalData
-
+class ExcessiveDataError(Exception):
+    pass
 class ParseData:
     def __init__(self,fdate,tdate,fq,radb,hidden,object_fullpath,signal_type):
         try:    
@@ -28,6 +29,8 @@ class ParseData:
                         self.flag[self.uid]=0
                     for vm,vo,dt,ms,vq,vv in self.unparsed_data:
                         dt=dt+datetime.timedelta(milliseconds=ms)
+                        if len(self.data)>12800:
+                            raise ExcessiveDataError
                         if dt<fdate or vo !=self.uid:
                             continue
                         if dt>tdate:
@@ -65,6 +68,8 @@ class ParseData:
                 self.result = int(not self.data==[])
         except PermissionError:
             self.result = -1
+        except ExcessiveDataError:
+            self.result = -4
     def roundTime(self,d1,roundTo):
         seconds=(d1-d1.min).seconds
         rounding=(seconds+roundTo/2)//roundTo*roundTo
@@ -81,6 +86,7 @@ class ParseData:
 
 
 if __name__ == "__main__":
-  a=ParseData(datetime.datetime(2019,5,28),datetime.datetime(2019,5,30),2,1,False,'MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
-  print(a.result)
+  #a=ParseData(datetime.datetime(2019,5,28),datetime.datetime(2019,5,30),2,1,False,'MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
+  b=a=ParseData(datetime.datetime(2019,5,28),datetime.datetime(2019,7,6),1,1,False,'MOSG / 33KV / H03_CABLEFDR-H16 / MEASUREMENT / VOLTAGE VBR','All Signals')
+  print(b.result)
  

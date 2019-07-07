@@ -11,8 +11,8 @@ from sqlscript import GetSignals
 from signaltree import Tree,Node
 import threading
 from os import system
-w=800
-h=800
+w=1200
+h=700
 
 class Navbar(tk.Frame):
     def __init__(self,parent):
@@ -57,7 +57,9 @@ class Navbar(tk.Frame):
             for node_child in node.getChildren():
                 self.insert_node(node_iid,node_child, node_child.data)
         else:
-            print(self.tree.item(node_iid,option='values')[0])
+            values=self.tree.item(node_iid,option='values')
+            if values:
+                self.parent.plabel.config(text=values[0])
     def callback(self,*args):
         self.tree.delete(*self.root_iid)
         self.root_iid=[]
@@ -68,11 +70,11 @@ class Navbar(tk.Frame):
             self.insert_node('', self.system,self.system.data,root=True)
 class MainApplication(tk.Canvas):
     def __init__(self,parent):
-        tk.Canvas.__init__(self,parent,height=h,width=w)
+        tk.Canvas.__init__(self,parent)
         self.parent=parent
         self.setup()
-        self.navbar=Navbar(parent)
-        self.navbar.place(x=50,y=180)
+        self.navbar=Navbar(self)
+        self.navbar.place(x=550,y=20)
         self.create_image(0,0,image=self.photoimage,anchor='nw')
         self.create_text(15,20,text="Time Period :",fill='white',anchor='nw',font=("Arial", 12, "bold"))
         self.fbutton.place(x=150,y=20)
@@ -81,30 +83,32 @@ class MainApplication(tk.Canvas):
         self.tlabel.place(x=250,y=45)
         self.advanbutton.place(x=350,y=25)
         self.create_text(15,90,text="Object Path: ",fill='white',anchor='nw',font=("Arial", 12, "bold"))
-        self.pentry.place(x=150,y=90,width=370)
-        self.cbutton.place(x=600,y=500)
+        self.plabel.place(x=150,y=90,width=370)
+        self.cbutton.place(x=150,y=200)
     def extract(self):
         def thread_extract():
             self.progress.place(x=200,y=300)
             self.progress.start()
-            self.object_fullpath=self.pentry.get()
+            self.object_fullpath=self.plabel.cget('text')
             if self.hidden:
                 found=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),
                 datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day),
-                0,0,self.hidden,self.object_fullpath.upper(),self.optionvar.get()).result
+                0,0,self.hidden,self.object_fullpath.upper(),self.navbar.optionvar.get()).result
             else:
                 found=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),
                 datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day),
-                self.fqentry.get(),self.radb.get(),self.hidden,self.object_fullpath.upper(),self.optionvar.get()).result       
+                self.fqentry.get(),self.radb.get(),self.hidden,self.object_fullpath.upper(),self.navbar.optionvar.get()).result       
             self.progress.stop()
             self.progress.place_forget()
             self.enable_all()
             if found==-1:
                 tk.messagebox.showerror("Error","Close the excel file and try again.")
-            if found==-2:
+            elif found==-2:
                 tk.messagebox.showerror("Error","Something went wrong. Restart the application and try again.")
             elif found==-3:
                 tk.messagebox.showwarning("Info","No data was found for the signal.")
+            elif found==-4:
+                tk.messagebox.showerror("Error","Too much data to process. Narrow down your search criteria and try again")
             elif found==0:
                 tk.messagebox.showwarning("Info","No data was found for the signal in the selected time period.")
             elif found==1:
@@ -135,12 +139,8 @@ class MainApplication(tk.Canvas):
         self.flag=tk.IntVar(self,0)
         self.flag.trace('w',self.callback)
         self.default_text='MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN'
-        self.pentry=tk.Entry(self)
-        self.pentry.config(fg='grey')
-        self.pentry.insert(0,self.default_text)
-        self.pentry.bind('<FocusIn>',self.in_focus)
-        self.pentry.bind('<FocusOut>',self.out_focus)
-        self.cbutton=tk.Button(self,text="Create excel File!",command=self.extract)
+        self.plabel=tk.Label(self,text=self.default_text)
+        self.cbutton=tk.Button(self,text="Create excel File!",command=self.extract,width=20,height=2)
         self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL,length=100,  mode='indeterminate')
     def fgetdate(self):
         def print_sel():
@@ -213,20 +213,11 @@ class MainApplication(tk.Canvas):
             return True
         else:
             return False
-    def in_focus(self,*args):
-        if self.pentry.get()==self.default_text:
-            self.pentry.delete(0,tk.END)
-            self.pentry.config(fg='black')
-    def out_focus(self,*args):
-        if self.pentry.get().isspace() or self.pentry.get()=='' :
-            self.pentry.insert(0,self.default_text)
-            self.pentry.config(fg='grey')
     def disable_all(self):
         self.cbutton['state']='disabled'
         self.advanbutton['state']='disabled'
         self.fbutton['state']='disabled'
         self.tbutton['state']='disabled'
-        self.pentry['state']='disabled'
         if not self.hidden:
             self.radiobuttton1['state']='disabled'
             self.radiobuttton2['state']='disabled'
@@ -236,7 +227,6 @@ class MainApplication(tk.Canvas):
         self.cbutton['state']='normal'
         self.advanbutton['state']='normal'
         self.fbutton['state']='normal'
-        self.pentry['state']='normal'
         if not self.hidden:
             self.radiobuttton1['state']='normal'
             self.radiobuttton2['state']='normal'
