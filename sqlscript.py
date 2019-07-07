@@ -19,17 +19,20 @@ class GetSignalData:
                 self.sql="select * from objects where object_fullpath='{}'".format(object_fullpath)
                 cursor.execute(self.sql)
                 self.result=cursor.fetchall()
+                row=()
                 for row in self.result:
                     if row[42]:
                         schar=row[42][-1]
                         if schar != 'c' and self.option == 1:
+                            self.uid=row[1]
                             break
                         elif schar == 'c' and self.option == 0:
+                            self.uid=row[1]
                             break
-                    elif self.option==1:
+                    elif self.option == 1:
+                        self.uid=row[1]
                         break
-                self.uid=row[1]
-                if self.result:
+                if self.result and row:
                     run("mysqldump -u mcisadmin -ps$e!P!C!L@2014 pacis > pacis.sql",shell=True)
                     self.all_tables=self.get_tables(self.uid)
                     run('del pacis.sql',shell=True)
@@ -37,7 +40,6 @@ class GetSignalData:
                         self.sql="SELECT * FROM "+','.join(self.all_tables)
                         cursor.execute(self.sql)
                         self.result=generator(cursor)
-                        #self.result = cursor.fetchall()
                     else: 
                         self.result = 0
         except Exception as e:
@@ -68,9 +70,9 @@ class GetSignals:
         self.connection=pymysql.connect(host='localhost',user='mcisadmin',password='s$e!P!C!L@2014',db='pacis')
         try:
             with self.connection.cursor() as cursor:
-                self.sql="SELECT object_fullpath,object_typ0,object_typ5 FROM objects order by object_fullpath"
+                self.sql="SELECT object_fullpath,object_typ0,object_typ5 FROM objects where (object_typ5='' and object_typ0='scs')or(object_typ5<>'') order by object_fullpath"
                 cursor.execute(self.sql)
-                self.result=cursor.fetchall()
+                self.result=generator(cursor)
         except Exception as e:
             print(e)
             self.result=-2
@@ -80,6 +82,7 @@ class GetSignals:
 
 if __name__ == "__main__":
    # data=GetSignalData('MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
-    data=GetSignalData('MOSG / 33KV / H06_T10 (LV) INC / CONTROL MODE / CONTROL MODE','All Controls')
-    print(data.result[0])
+   # data=GetSignalData('MOSG / 33KV / H06_T10 (LV) INC / CONTROL MODE / CONTROL MODE','All Controls')
+    data=GetSignals()
+    print(data.result)
 
