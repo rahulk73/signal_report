@@ -15,33 +15,42 @@ class GetSignalData:
         self.result=()
         self.connection=pymysql.connect(host='localhost',user='mcisadmin',password='s$e!P!C!L@2014',db='pacis')
         try:
+            self.result = 0
             with self.connection.cursor() as cursor:
-                self.sql="select * from objects where object_fullpath='{}'".format(object_fullpath)
+                self.sql = "select object_typ5,object_uid32 from objects where object_fullpath='{}' and not(object_typ0='site' and object_typ5='')".format(object_fullpath)
                 cursor.execute(self.sql)
-                self.result=cursor.fetchall()
-                row=()
-                for row in self.result:
-                    if row[42]:
-                        schar=row[42][-1]
-                        if schar != 'c' and self.option == 1:
+                self.rows = cursor.fetchall()
+                self.mvsignal=False
+                self.uid=None
+                for row in self.rows:
+                    if row[0]:
+                        schar = row[0][-1]
+                        if schar == 'v':
+                            self.uid=row[1]
+                            self.mvsignal=True
+                            break
+                        elif schar != 'c' and self.option == 1:
                             self.uid=row[1]
                             break
-                        elif schar == 'c' and self.option == 0:
-                            self.uid=row[1]
+                        elif schar =='c' and self.option == 0:
+                            self.uid = row[1]
                             break
                     elif self.option == 1:
-                        self.uid=row[1]
+                        self.uid = row[1]
                         break
-                if self.result and row:
-                    run("mysqldump -u mcisadmin -ps$e!P!C!L@2014 pacis > pacis.sql",shell=True)
-                    self.all_tables=self.get_tables(self.uid)
-                    run('del pacis.sql',shell=True)
-                    if self.all_tables:
-                        self.sql="SELECT * FROM "+','.join(self.all_tables)
+                if self.uid:
+                    if self.mvsignal:
+                        run("mysqldump -u mcisadmin -ps$e!P!C!L@2014 pacis > pacis.sql",shell=True)
+                        self.all_tables=self.get_tables(self.uid)
+                        run('del pacis.sql',shell=True)
+                        if self.all_tables:
+                            self.sql="SELECT * FROM "+','.join(self.all_tables)
+                            cursor.execute(self.sql)
+                            self.result=generator(cursor)
+                    else:
+                        self.sql="select event_datetime,event_millisec,event_object_uid32,event_mess,event_userslogged from `events` where event_object_uid32={}".format(self.uid)
                         cursor.execute(self.sql)
                         self.result=generator(cursor)
-                    else: 
-                        self.result = 0
         except Exception as e:
             print(e)
             self.result= -2
@@ -81,8 +90,8 @@ class GetSignals:
 
 
 if __name__ == "__main__":
-   # data=GetSignalData('MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
-   # data=GetSignalData('MOSG / 33KV / H06_T10 (LV) INC / CONTROL MODE / CONTROL MODE','All Controls')
-    data=GetSignals()
+    #data=GetSignalData('MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
+    data=GetSignalData('MOSG / 33KV / H32_T30 (LV) INC / BCU SYNCROCHECK / ON/OFF SPS','All Signals')
+    #data=GetSignals()
     print(data.result)
-
+    print(next(data.result))
