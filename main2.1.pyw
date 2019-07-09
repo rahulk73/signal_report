@@ -46,7 +46,7 @@ class Navbar(tk.Frame):
             self.internal_nodes[node_iid] = node
             self.tree.insert(node_iid, 'end')
         else:
-            self.tree.item(node_iid,values=[node.absolute_path])
+            self.tree.item(node_iid,values=[node.absolute_path,node.mv])
         if root:
             self.root_iid.append(node_iid)
     def open_node(self, event):
@@ -60,6 +60,21 @@ class Navbar(tk.Frame):
             values=self.tree.item(node_iid,option='values')
             if values:
                 self.parent.plabel.config(text=values[0])
+                if values[1] != 'MV':
+                    self.parent.advanbutton['state']='disabled'
+                    if not self.parent.hidden:
+                        self.parent.btn_text.set("Show Advanced Options")
+                        self.parent.delete('showtext')
+                        self.parent.fqentry.place_forget()
+                        self.parent.optionmenu.place_forget()
+                        self.parent.radiobutton1.place_forget()
+                        self.parent.radiobutton2.place_forget()
+                        self.parent.radiobutton3.place_forget()
+                        self.parent.hidden=True
+                    
+                else:
+                    self.parent.advanbutton['state']='normal'
+                print(values)
     def callback(self,*args):
         self.tree.delete(*self.root_iid)
         self.root_iid=[]
@@ -91,13 +106,16 @@ class MainApplication(tk.Canvas):
             self.progress.start()
             self.object_fullpath=self.plabel.cget('text')
             if self.hidden:
-                found=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),
+                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),
                 datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day),
-                0,0,self.hidden,self.object_fullpath.upper(),self.navbar.optionvar.get()).result
+                self.hidden,self.object_fullpath.upper(),self.navbar.optionvar.get())
+                found=extraction.result
             else:
-                found=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),
-                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day),
-                self.fqentry.get(),self.radb.get(),self.hidden,self.object_fullpath.upper(),self.navbar.optionvar.get()).result       
+                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),
+                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day)
+                ,self.hidden,self.object_fullpath.upper(),self.navbar.optionvar.get(),
+                self.fqentry.get(),self.radb.get(),self.optionvar.get())
+                found=extraction.result       
             self.progress.stop()
             self.progress.place_forget()
             self.enable_all()
@@ -113,7 +131,7 @@ class MainApplication(tk.Canvas):
                 tk.messagebox.showwarning("Info","No data was found for the signal in the selected time period.")
             elif found==1:
                 tk.messagebox.showinfo("Extraction Successful !","You can view the records in the file tables.xlsx")
-                system('start EXCEL.EXE ./SignalLog/tables.xlsx')
+                system("start EXCEL.EXE \"./SignalLog/"+extraction.str_time+".xlsx\"")
         self.disable_all()        
         threading.Thread(target=thread_extract).start()
         
@@ -136,6 +154,11 @@ class MainApplication(tk.Canvas):
         self.fqvar=tk.StringVar(self,value='1')
         self.fqvar.trace('w',self.update)
         self.radb=tk.IntVar(self,2)
+        self.OPTIONS=['Changes','Consumption','Average']
+        self.optionvar=tk.StringVar(self)
+        self.optionvar.set(self.OPTIONS[0])
+        self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS)
+        self.optionmenu.config(width=10)
         self.flag=tk.IntVar(self,0)
         self.flag.trace('w',self.callback)
         self.default_text='MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN'
@@ -177,31 +200,31 @@ class MainApplication(tk.Canvas):
         ttk.Button(self.top, text="Go", command=print_sel).pack()
     def advance(self):
         if self.hidden:
-            self.radiobuttton1=tk.Radiobutton(self,text="Second(s)",value=1,variable=self.radb)
-            self.radiobuttton2=tk.Radiobutton(self,text="Minute(s)",value=2,variable=self.radb)
-            self.radiobuttton3=tk.Radiobutton(self,text="Hour(s)",value=3,variable=self.radb)
+            self.radiobutton1=tk.Radiobutton(self,text="Second(s)",value=1,variable=self.radb)
+            self.radiobutton2=tk.Radiobutton(self,text="Minute(s)",value=2,variable=self.radb)
+            self.radiobutton3=tk.Radiobutton(self,text="Hour(s)",value=3,variable=self.radb)
             self.fqentry=tk.Entry(self,width=2,textvariable=self.fqvar)
             self.reg=self.register(self.valid)
             self.fqentry.config(validate='key',validatecommand=(self.reg,'%P'))
             self.btn_text.set("Hide Advanced Options")
-            self.create_text(15,130,text="Show changes every ",fill='white',anchor='nw',font=("Arial",12,'bold'),tag='showtext')  
-            self.fqentry.place(x=180,y=133)
-            self.radiobuttton1.place(x=200,y=130)
-            self.radiobuttton2.place(x=280,y=130)
-            self.radiobuttton3.place(x=360,y=130)
+            self.create_text(15,130,text="Show\t\t\tevery".expandtabs(11),fill='white',anchor='nw',font=("Arial",12,'bold'),tag='showtext') 
+            self.optionmenu.place(x=65,y=125) 
+            self.fqentry.place(x=230,y=133)
+            self.radiobutton1.place(x=260,y=130)
+            self.radiobutton2.place(x=340,y=130)
+            self.radiobutton3.place(x=420,y=130)
         else:
             self.btn_text.set("Show Advanced Options")
             self.delete('showtext')
-            self.delete('defaultinfo')
             self.fqentry.place_forget()
-            self.radiobuttton1.place_forget()
-            self.radiobuttton2.place_forget()
-            self.radiobuttton3.place_forget()
+            self.radiobutton1.place_forget()
+            self.radiobutton2.place_forget()
+            self.optionmenu.place_forget()
+            self.radiobutton3.place_forget()
         self.hidden = not self.hidden
 
     def callback(self,*args):
         if(self.flag.get()):
-            print("To button enabled",args)
             self.tbutton.config(state='normal')
     def update(self,*args):
         if(self.fqvar.get()):
@@ -219,19 +242,21 @@ class MainApplication(tk.Canvas):
         self.fbutton['state']='disabled'
         self.tbutton['state']='disabled'
         if not self.hidden:
-            self.radiobuttton1['state']='disabled'
-            self.radiobuttton2['state']='disabled'
-            self.radiobuttton3['state']='disabled'
+            self.radiobutton1['state']='disabled'
+            self.radiobutton2['state']='disabled'
+            self.radiobutton3['state']='disabled'
             self.fqentry['state']='disabled'
+            self.optionmenu['state']='disabled'
     def enable_all(self):
         self.cbutton['state']='normal'
         self.advanbutton['state']='normal'
         self.fbutton['state']='normal'
         if not self.hidden:
-            self.radiobuttton1['state']='normal'
-            self.radiobuttton2['state']='normal'
-            self.radiobuttton3['state']='normal'
+            self.radiobutton1['state']='normal'
+            self.radiobutton2['state']='normal'
+            self.radiobutton3['state']='normal'
             self.fqentry['state']='normal'
+            self.optionmenu['state']='normal'
     def date_format(self,date):
         return(str(datetime.datetime.strptime(str(date),"%Y-%m-%d").strftime("%d/%m/%Y")))
 if  __name__=='__main__':
