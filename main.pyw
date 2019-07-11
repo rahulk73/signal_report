@@ -10,6 +10,7 @@ from xlsscript import ParseData
 from sqlscript import GetSignals
 from signaltree import Tree,Node
 import threading
+from functools import partial
 from os import system
 w=1200
 h=700
@@ -27,26 +28,34 @@ class Navbar(tk.Frame):
         self.tree.grid(ipadx=100,ipady=100,sticky='e')
         ysb.grid(row=0, column=1, sticky='ns')
         xsb.grid(row=1, column=0, sticky='ew')
-        self.OPTIONS=['All Signals','All Controls']
+        self.OPTIONS=['All Signals','All Controls','All Measurements','All Metering']
         self.optionvar=tk.StringVar(self)
         self.optionvar.set(self.OPTIONS[0])
         self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS,command=self.callback)
         self.optionmenu.grid(row=0,column=2)
         self.layout=Tree(GetSignals().result)
-        self.electrical=self.layout.root[0]
-        self.system=self.layout.root[1]
-        self.electrical_control=self.layout.root[2]
+        self.all_electrical=self.layout.root['All']['site']
+        self.all_system=self.layout.root['All']['scs']
+        self.control=self.layout.root['Control']
+        self.measurement=self.layout.root['Measurement']
+        self.meter=self.layout.root['Meter']
         self.root_iid=[]
-        self.insert_node('', self.electrical,self.electrical.data,root=True)
-        self.insert_node('', self.system,self.system.data,root=True)
+        self.insert_node('', self.all_electrical,self.all_electrical.data,root=True)
+        self.insert_node('', self.all_system,self.all_system.data,root=True)
         self.tree.bind('<<TreeviewOpen>>', self.open_node)
+        self.tree.bind('<<TreeviewSelect>>',self.select)
+    def select(self,event):
+        tuple_iid=self.tree.selection()
+        mapfunc=partial(self.tree.item,option='values')
+        x=list(map(mapfunc,tuple_iid))
+        print(x)
     def insert_node(self, parent_iid, node,text,root=False):
         node_iid = self.tree.insert(parent_iid, 'end', text=text, open=False)
         if node.isInternalNode():
             self.internal_nodes[node_iid] = node
             self.tree.insert(node_iid, 'end')
         else:
-            self.tree.item(node_iid,values=[node.absolute_path,node.mv])
+            self.tree.item(node_iid,values=[node.absolute_path])
         if root:
             self.root_iid.append(node_iid)
     def open_node(self, event):
@@ -56,33 +65,31 @@ class Navbar(tk.Frame):
             self.tree.delete(self.tree.get_children(node_iid))
             for node_child in node.getChildren():
                 self.insert_node(node_iid,node_child, node_child.data)
-        else:
-            values=self.tree.item(node_iid,option='values')
-            if values:
-                self.parent.plabel.config(text=values[0])
-                if values[1] != 'MV':
-                    self.parent.advanbutton['state']='disabled'
-                    if not self.parent.hidden:
-                        self.parent.btn_text.set("Show Advanced Options")
-                        self.parent.delete('showtext')
-                        self.parent.fqentry.place_forget()
-                        self.parent.optionmenu.place_forget()
-                        self.parent.radiobutton1.place_forget()
-                        self.parent.radiobutton2.place_forget()
-                        self.parent.radiobutton3.place_forget()
-                        self.parent.hidden=True
-                    
-                else:
-                    self.parent.advanbutton['state']='normal'
-                print(values)
     def callback(self,*args):
         self.tree.delete(*self.root_iid)
         self.root_iid=[]
-        if self.optionvar.get() == 'All Controls':
-            self.insert_node('', self.electrical_control,self.electrical_control.data,root=True)
+        if self.optionvar.get() != 'All Measurements':
+            self.parent.advanbutton['state']='disabled'
+            if not self.parent.hidden:
+                self.parent.btn_text.set("Show Advanced Options")
+                self.parent.delete('showtext')
+                self.parent.fqentry.place_forget()
+                self.parent.optionmenu.place_forget()
+                self.parent.radiobutton1.place_forget()
+                self.parent.radiobutton2.place_forget()
+                self.parent.radiobutton3.place_forget()
+                self.parent.hidden=True  
+            if self.optionvar.get() == 'All Controls':
+                self.insert_node('', self.control,self.control.data,root=True)
+            elif self.optionvar.get() == 'All Signals':
+                self.insert_node('', self.all_electrical,self.all_electrical.data,root=True)
+                self.insert_node('', self.all_system,self.all_system.data,root=True)
+            elif self.optionvar.get()=='All Metering':
+                self.insert_node('', self.meter,self.meter.data,root=True)
         else:
-            self.insert_node('', self.electrical,self.electrical.data,root=True)
-            self.insert_node('', self.system,self.system.data,root=True)
+            self.parent.advanbutton['state']='normal'
+            self.insert_node('',self.measurement,self.measurement.data,root=True)
+
 class MainApplication(tk.Canvas):
     def __init__(self,parent):
         tk.Canvas.__init__(self,parent)
@@ -150,6 +157,7 @@ class MainApplication(tk.Canvas):
         self.parent.title("Create Exel Log File")
         self.btn_text=tk.StringVar(self,value="Show Advanced Options")
         self.advanbutton=tk.Button(self,textvariable=self.btn_text,command=self.advance)
+        self.advanbutton['state']='disabled'
         self.hidden=True
         self.fqvar=tk.StringVar(self,value='1')
         self.fqvar.trace('w',self.update)

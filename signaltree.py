@@ -3,7 +3,6 @@ class Node:
     def __init__(self,data,parent=None):
         self.data=data
         self.children=[]
-        self.mv=''
         if parent:
             parent.children.append(self)
     def getChildrenData(self):
@@ -26,27 +25,32 @@ class Node:
  
 class Tree:
     def __init__(self,data_tuples):
-        def helper(next_parent,data_split,absolute_path,isMV):
+        def helper(next_parent,data_split,absolute_path):
             for node_val in data_split:
                 if node_val not in next_parent.getChildrenData():
                     next_parent=Node(node_val,parent=next_parent)
                 else:
                     next_parent=next_parent.findChild(node_val)
             next_parent.absolute_path=absolute_path
-            if isMV:
-                next_parent.mv='MV'
 
-        self.root=[Node('Electrical'),Node('System'),Node('Electrical-Control')]
-        for data in data_tuples:
-            data_split=data[0].split(' / ')
-            if data[1]=='site':
-                if data[2]:
-                    if data[2][-1]!='c':
-                        helper(self.root[0],data_split,data[0],data[2][-1]=='v')
-                    else:
-                        helper(self.root[2],data_split,data[0],False)
-            else:
-                helper(self.root[1],data_split,data[0],False)
+        self.control = frozenset(['modulespc','switch_dpc','cs_ctrlonoff_spc','moduledpc'])
+        self.allsignals = frozenset(['mappingsps','cs_voltageabsence_sps','cs_authostate_sps','cs_onoff_sps','cs_voltagerefpresence_sp','computedswitchpos_dps',
+        'cs_busbarvchoice_sps','cs_acceptforcing_sps','groupsps','tapfct','cs_voltagepresence_sps','cs_closeorderstate_sps','userfunctionsps',
+        'cs_voltagerefabsence_sps','moduledps','modulesps'])
+        self.measurement = frozenset(['modulemv'])
+        self.meter = frozenset(['modulemeter'])
+        self.root={'All':{'site':Node('Electrical'),'scs':Node('System')}, 'Control':Node('Electrical-Control'), 'Measurement':Node('Electrical-Measurement'),
+        'Meter':Node('Electrical-Meter')}
+        for fullpath,typ0,typ5,iec in data_tuples:
+            data_split=fullpath.split(' / ')
+            if ((not typ5 and iec) or (typ5 in self.allsignals)) and typ0:
+                helper(self.root['All'][typ0],data_split,fullpath)
+            elif typ5 in self.control:
+                helper(self.root['Control'],data_split,fullpath)
+            elif typ5 in self.measurement:
+                helper(self.root['Measurement'],data_split,fullpath)
+            elif typ5 in self.meter:
+                helper(self.root['Meter'],data_split,fullpath)
     def getRoot(self):
         return self.root
 if __name__ == "__main__":
