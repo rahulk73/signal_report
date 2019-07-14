@@ -30,7 +30,7 @@ class ParseData:
             if not self.unparsed_data:
                 self.workbook.close()
                 self.result= -3
-            elif self.signaldata.mvsignal:
+            elif signal_type == 'All Measurements'
                 self.data=[]
                 if not hidden:
                     self.option={1:1.0,2:60.0,3:3600.0}
