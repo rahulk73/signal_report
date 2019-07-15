@@ -113,14 +113,14 @@ class MainApplication(tk.Canvas):
             self.progress.start()
             self.object_fullpaths=self.listbox.get(0,tk.END)
             if self.hidden:
-                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),
-                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day),
+                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhourstr),int(self.fminstr)),
+                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thourstr),int(self.tminstr)),
                 self.hidden,self.object_fullpaths,self.navbar.optionvar.get())
                 found=extraction.result
             else:
-                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),
-                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day)
-                ,self.hidden,self.object_fullpath,self.navbar.optionvar.get(),
+                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhourstr),int(self.fminstr)),
+                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thourstr),int(self.tminstr)),
+                self.hidden,self.object_fullpath,self.navbar.optionvar.get(),
                 self.fqentry.get(),self.radb.get(),self.optionvar.get())
                 found=extraction.result       
             self.progress.stop()
@@ -143,22 +143,19 @@ class MainApplication(tk.Canvas):
         threading.Thread(target=thread_extract).start()
         
     def setup(self):
-        self.tdate=datetime.datetime.combine(calendar.datetime.date.today(),datetime.time(12,30))
-        self.fdate=calendar.datetime.date(self.tdate.year,self.tdate.month,self.tdate.day)+datetime.timedelta(days=-2,hours=-2)
+        #self.tdate=datetime.datetime.combine(calendar.datetime.date.today(),datetime.time(12,30))
+        self.tdate = calendar.datetime.date.today()
+        self.fdate=calendar.datetime.date(self.tdate.year,self.tdate.month,self.tdate.day)+datetime.timedelta(days=-2)
         self.fbutton=ttk.Button(self, text='From', command=self.fgetdate,underline=1)
-        self.reg2=self.register(self.fhour_valid)
-        self.fhourstr=tk.StringVar(self,'10')
-        self.fhour = tk.Spinbox(self,from_=0,to=23,wrap=True,validate='focusout',validatecommand=(self.reg2,'%P'),invalidcommand=self.fhour_invalid,textvariable=self.fhourstr,width=2)
-        self.reg3=self.register(self.fmin_valid)
+        self.fhourstr=tk.StringVar(self,str((datetime.datetime.now()+datetime.timedelta(hours=-2)).hour))
+        self.fhour = tk.Spinbox(self,from_=0,to=23,wrap=True,textvariable=self.fhourstr,width=2,state='readonly')
         self.fminstr=tk.StringVar(self,'30')
-        self.fmin = tk.Spinbox(self,from_=0,to=59,wrap=True,validate='focusout',validatecommand=(self.reg3,'%P'),invalidcommand=self.fmin_invalid,textvariable=self.fminstr,width=2)
-        self.reg4=self.register(self.thour_valid)
-        self.thourstr=tk.StringVar(self,'12')
-        self.thour = tk.Spinbox(self,from_=0,to=23,wrap=True,validate='focusout',validatecommand=(self.reg4,'%P'),invalidcommand=self.thour_invalid,textvariable=self.thourstr,width=2)
-        self.reg5=self.register(self.tmin_valid)
+        self.fmin = tk.Spinbox(self,from_=0,to=59,wrap=True,textvariable=self.fminstr,width=2,state='readonly')
+        self.thourstr=tk.StringVar(self,str((datetime.datetime.now()+datetime.timedelta(hours=-1)).hour))
+        self.thour = tk.Spinbox(self,from_=0,to=23,wrap=True,textvariable=self.thourstr,width=2,state='readonly')
         self.tminstr=tk.StringVar(self,'30')
-        self.tmin = tk.Spinbox(self,from_=0,to=59,wrap=True,validate='focusout',validatecommand=(self.reg5,'%P'),invalidcommand=self.tmin_invalid,textvariable=self.tminstr,width=2)
-        self.tbutton=ttk.Button(self, text='To', command=self.tgetdate,state='disabled')
+        self.tmin = tk.Spinbox(self,from_=0,to=59,wrap=True,textvariable=self.tminstr,width=2,state='readonly')
+        self.tbutton=ttk.Button(self, text='To', command=self.tgetdate)
         self.fstr=tk.StringVar(self,self.date_format(self.fdate))
         self.flabel=tk.Label(self,textvariable=self.fstr,width=10)
         self.tstr=tk.StringVar(self,self.date_format(self.tdate))
@@ -178,7 +175,12 @@ class MainApplication(tk.Canvas):
         self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS)
         self.optionmenu.config(width=10)
         self.flag=tk.IntVar(self,0)
-        self.flag.trace('w',self.callback)
+        self.from_within = 0
+        self.flag.trace('w',self.flag_callback)
+        self.fhourstr.trace('w',self.time_callback)
+        self.fminstr.trace('w',self.time_callback)
+        self.thourstr.trace('w',self.time_callback)
+        self.tminstr.trace('w',self.time_callback)
         self.container = tk.Frame(self)
         self.listbox = tk.Listbox(self.container,width=85,height=20)
         self.ysb = ttk.Scrollbar(self.container, orient='vertical',command=self.listbox.yview)
@@ -187,14 +189,13 @@ class MainApplication(tk.Canvas):
         self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL,length=100,  mode='indeterminate')
     def fgetdate(self):
         def print_sel():
-            if self.fcal.selection_get()<calendar.datetime.date.today():
+            if self.datetimecheck(fdate=self.fcal.selection_get()):
                 self.flag.set(1)
                 self.fdate=self.fcal.selection_get()
                 self.fstr.set(self.date_format(self.fdate))
                 self.ftop.destroy()
             else:
-                messagebox.showerror("Date Error","Date is invalid. Try Again")
-
+                self.flag.set(1)
         self.ftop = tk.Toplevel(self)
         self.ftop.grab_set()
 
@@ -205,13 +206,13 @@ class MainApplication(tk.Canvas):
         ttk.Button(self.ftop, text="Go", command=print_sel).pack()
     def tgetdate(self):
         def print_sel():
-            if self.tcal.selection_get()>self.fdate and self.tcal.selection_get()<=calendar.datetime.date.today():
+            if self.datetimecheck(tdate=self.tcal.selection_get()):
                 self.flag.set(0)
                 self.tdate=self.tcal.selection_get()
                 self.tstr.set(self.date_format(self.tdate))
                 self.ttop.destroy()
             else:
-                messagebox.showerror("Date Error","The time interval is invalid. Try Again")
+                self.flag.set(1)
         self.ttop = tk.Toplevel(self)
         self.ttop.grab_set()
         self.tcal = Calendar(self.ttop, font="Arial 14", selectmode='day',
@@ -242,50 +243,35 @@ class MainApplication(tk.Canvas):
             self.optionmenu.place_forget()
             self.radiobutton3.place_forget()
         self.hidden = not self.hidden
-
-    def callback(self,*args):
-        if(self.flag.get()):
-            self.tbutton.config(state='normal')
-    def fhour_invalid(self):
-        self.fhourstr.set('10')
-    def fhour_valid(self,input):
-        if (input.isdigit() and int(input) in range(24) and len(input) in range(1,3)):
-            valid = True
+    def datetimecheck(self,fdate=None,tdate=None):
+        fhour = int(self.fhourstr.get())
+        fmin = int(self.fminstr.get())
+        thour = int(self.thourstr.get())
+        tmin = int(self.tminstr.get())
+        if fdate:
+            return (datetime.datetime.combine(fdate,datetime.time(hour=fhour,minute=fmin))<
+            datetime.datetime.combine(self.tdate,datetime.time(hour=thour,minute=tmin)))
+        elif tdate:
+            return (datetime.datetime.combine(self.fdate,datetime.time(hour=fhour,minute=fmin))<
+            datetime.datetime.combine(tdate,datetime.time(hour=thour,minute=tmin)) and datetime.datetime.combine(tdate,datetime.time(hour=thour,minute=tmin))
+            <=datetime.datetime.now())
         else:
-            valid = False
-        if not valid:
-            self.fhour.after_idle(lambda: self.fhour.config(validate='focusout'))
-        return valid
-    def fmin_invalid(self):
-        self.fminstr.set('30')
-    def fmin_valid(self,input):
-        if (input.isdigit() and int(input) in range(60) and len(input) in range(1,3)):
-            valid = True
-        else:
-            valid = False
-        if not valid:
-            self.fmin.after_idle(lambda: self.fmin.config(validate='focusout'))
-        return valid
-    def thour_invalid(self):
-        self.thourstr.set('10')
-    def thour_valid(self,input):
-        if (input.isdigit() and int(input) in range(24) and len(input) in range(1,3)):
-            valid = True
-        else:
-            valid = False
-        if not valid:
-            self.thour.after_idle(lambda: self.thour.config(validate='focusout'))
-        return valid
-    def tmin_invalid(self):
-        self.tminstr.set('30')
-    def tmin_valid(self,input):
-        if (input.isdigit() and int(input) in range(60) and len(input) in range(1,3)):
-            valid = True
-        else:
-            valid = False
-        if not valid:
-            self.tmin.after_idle(lambda: self.tmin.config(validate='focusout'))
-        return valid
+            return (datetime.datetime.combine(self.fdate,datetime.time(hour=fhour,minute=fmin))<
+            datetime.datetime.combine(self.tdate,datetime.time(hour=thour,minute=tmin)) and datetime.datetime.combine(self.tdate,datetime.time(hour=thour,minute=tmin))
+            <=datetime.datetime.now())
+    def flag_callback(self,*args):
+        if self.flag.get() == 1:
+            messagebox.showerror("Date Error","The time interval is invalid. Try Again")
+    def time_callback(self,*agrs):
+        if (not self.from_within) and (not self.datetimecheck()):
+            self.flag.set(1)
+            self.from_within=1
+            self.fhourstr.set(str((datetime.datetime.now()+datetime.timedelta(hours=-2)).hour))
+            self.fminstr.set('30')
+            self.thourstr.set(str((datetime.datetime.now()+datetime.timedelta(hours=-1)).hour))
+            self.tminstr.set('30')
+            self.from_within=0
+            self.flag.set(0)
     def freq_invalid(self):
         self.fqvar.set('1')
     def freq_valid(self,input):
