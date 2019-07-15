@@ -12,7 +12,7 @@ from signaltree import Tree,Node
 import threading
 from functools import partial
 from os import system
-w=1200
+w=1400
 h=700
 
 class Navbar(tk.Frame):
@@ -20,7 +20,7 @@ class Navbar(tk.Frame):
         tk.Frame.__init__(self,parent)
         self.parent=parent
         self.internal_nodes = dict()
-        self.tree = ttk.Treeview(self)
+        self.tree = CheckboxTreeview(self)
         ysb = ttk.Scrollbar(self, orient='vertical', command=self.tree.yview)
         xsb = ttk.Scrollbar(self, orient='horizontal', command=self.tree.xview)
         self.tree.configure(yscroll=ysb.set, xscroll=xsb.set)
@@ -39,34 +39,26 @@ class Navbar(tk.Frame):
         self.control=self.layout.root['Control']
         self.measurement=self.layout.root['Measurement']
         self.meter=self.layout.root['Meter']
-        self.root_iid=[]
-        self.insert_node('', self.all_electrical,self.all_electrical.data,root=True)
-        self.insert_node('', self.all_system,self.all_system.data,root=True)
-        self.tree.bind('<<TreeviewOpen>>', self.open_node)
-        self.tree.bind('<<TreeviewSelect>>',self.select)
-    def select(self,event):
-        tuple_iid=self.tree.selection()
-        mapfunc=partial(self.tree.item,option='values')
-        x=list(map(mapfunc,tuple_iid))
-        print(x)
-    def insert_node(self, parent_iid, node,text,root=False):
-        node_iid = self.tree.insert(parent_iid, 'end', text=text, open=False)
-        if node.isInternalNode():
-            self.internal_nodes[node_iid] = node
-            self.tree.insert(node_iid, 'end')
-        else:
+        self.root_iid = []
+        self.tree.bind('<<TreeviewSelect>>',self.getchecked)
+        self.build_tree('', self.all_electrical,self.all_electrical.data,root=True)
+        self.build_tree('', self.all_system,self.all_system.data,root=True)
+    def getchecked(self,*args):
+        self.parent.listbox.delete(0,tk.END)
+        for iid in self.tree.get_checked():
+            if not self.tree.get_children(iid):
+                self.parent.listbox.insert(tk.END,self.tree.item(iid,'values')[0])
+    def build_tree(self,parent_iid,node,data,root=False):
+        node_iid=self.tree.insert(parent_iid,"end",text=data)
+        if not node.isInternalNode():
             self.tree.item(node_iid,values=[node.absolute_path])
         if root:
             self.root_iid.append(node_iid)
-    def open_node(self, event):
-        node_iid = self.tree.focus()
-        node = self.internal_nodes.pop(node_iid, None)
-        if node:
-            self.tree.delete(self.tree.get_children(node_iid))
-            for node_child in node.getChildren():
-                self.insert_node(node_iid,node_child, node_child.data)
+        for child in node.getChildren():
+            self.build_tree(node_iid,child,child.data)
     def callback(self,*args):
         self.tree.delete(*self.root_iid)
+        self.parent.listbox.delete(0,tk.END)
         self.root_iid=[]
         if self.optionvar.get() != 'All Measurements':
             self.parent.advanbutton['state']='disabled'
@@ -80,15 +72,15 @@ class Navbar(tk.Frame):
                 self.parent.radiobutton3.place_forget()
                 self.parent.hidden=True  
             if self.optionvar.get() == 'All Controls':
-                self.insert_node('', self.control,self.control.data,root=True)
+                self.build_tree('', self.control,self.control.data,root=True)
             elif self.optionvar.get() == 'All Signals':
-                self.insert_node('', self.all_electrical,self.all_electrical.data,root=True)
-                self.insert_node('', self.all_system,self.all_system.data,root=True)
+                self.build_tree('', self.all_electrical,self.all_electrical.data,root=True)
+                self.build_tree('', self.all_system,self.all_system.data,root=True)
             elif self.optionvar.get()=='All Metering':
-                self.insert_node('', self.meter,self.meter.data,root=True)
+                self.build_tree('', self.meter,self.meter.data,root=True)
         else:
             self.parent.advanbutton['state']='normal'
-            self.insert_node('',self.measurement,self.measurement.data,root=True)
+            self.build_tree('',self.measurement,self.measurement.data,root=True)
 
 class MainApplication(tk.Canvas):
     def __init__(self,parent):
@@ -96,31 +88,39 @@ class MainApplication(tk.Canvas):
         self.parent=parent
         self.setup()
         self.navbar=Navbar(self)
-        self.navbar.place(x=550,y=20)
+        self.navbar.place(x=700,y=80)
         self.create_image(0,0,image=self.photoimage,anchor='nw')
         self.create_text(15,20,text="Time Period :",fill='white',anchor='nw',font=("Arial", 12, "bold"))
         self.fbutton.place(x=150,y=20)
         self.tbutton.place(x=250,y=20)
         self.flabel.place(x=150,y=45)
+        self.fhour.place(x=155,y=70)
+        self.create_text(185,70,text=":",fill='white',anchor='nw',font=("Arial", 12, "bold"))
+        self.fmin.place(x=195,y=70)
         self.tlabel.place(x=250,y=45)
+        self.thour.place(x=255,y=70)
+        self.create_text(285,70,text=":",fill='white',anchor='nw',font=("Arial", 12, "bold"))
+        self.tmin.place(x=295,y=70)
         self.advanbutton.place(x=350,y=25)
-        self.create_text(15,90,text="Object Path: ",fill='white',anchor='nw',font=("Arial", 12, "bold"))
-        self.plabel.place(x=150,y=90,width=370)
-        self.cbutton.place(x=150,y=200)
+        self.create_text(15,200,text="Object Path(s): ",fill='white',anchor='nw',font=("Arial", 12, "bold"))
+        self.container.place(x=150,y=200)
+        self.listbox.grid()
+        self.ysb.grid(row=0, column=1, sticky='ns')
+        self.cbutton.place(x=150,y=560)
     def extract(self):
         def thread_extract():
             self.progress.place(x=200,y=300)
             self.progress.start()
-            self.object_fullpath=self.plabel.cget('text')
+            self.object_fullpaths=self.listbox.get(0,tk.END)
             if self.hidden:
                 extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),
                 datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day),
-                self.hidden,self.object_fullpath.upper(),self.navbar.optionvar.get())
+                self.hidden,self.object_fullpaths,self.navbar.optionvar.get())
                 found=extraction.result
             else:
                 extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day),
                 datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day)
-                ,self.hidden,self.object_fullpath.upper(),self.navbar.optionvar.get(),
+                ,self.hidden,self.object_fullpath,self.navbar.optionvar.get(),
                 self.fqentry.get(),self.radb.get(),self.optionvar.get())
                 found=extraction.result       
             self.progress.stop()
@@ -143,11 +143,22 @@ class MainApplication(tk.Canvas):
         threading.Thread(target=thread_extract).start()
         
     def setup(self):
-        self.tdate=calendar.datetime.date.today()
-        self.fdate=calendar.datetime.date(self.tdate.year,self.tdate.month,self.tdate.day)+datetime.timedelta(days=-2)
+        self.tdate=datetime.datetime.combine(calendar.datetime.date.today(),datetime.time(12,30))
+        self.fdate=calendar.datetime.date(self.tdate.year,self.tdate.month,self.tdate.day)+datetime.timedelta(days=-2,hours=-2)
         self.fbutton=ttk.Button(self, text='From', command=self.fgetdate,underline=1)
-        self.tbutton=ttk.Button(self, text='To', command=self.tgetdate)
-        self.tbutton.config(state='disabled')
+        self.reg2=self.register(self.fhour_valid)
+        self.fhourstr=tk.StringVar(self,'10')
+        self.fhour = tk.Spinbox(self,from_=0,to=23,wrap=True,validate='focusout',validatecommand=(self.reg2,'%P'),invalidcommand=self.fhour_invalid,textvariable=self.fhourstr,width=2)
+        self.reg3=self.register(self.fmin_valid)
+        self.fminstr=tk.StringVar(self,'30')
+        self.fmin = tk.Spinbox(self,from_=0,to=59,wrap=True,validate='focusout',validatecommand=(self.reg3,'%P'),invalidcommand=self.fmin_invalid,textvariable=self.fminstr,width=2)
+        self.reg4=self.register(self.thour_valid)
+        self.thourstr=tk.StringVar(self,'12')
+        self.thour = tk.Spinbox(self,from_=0,to=23,wrap=True,validate='focusout',validatecommand=(self.reg4,'%P'),invalidcommand=self.thour_invalid,textvariable=self.thourstr,width=2)
+        self.reg5=self.register(self.tmin_valid)
+        self.tminstr=tk.StringVar(self,'30')
+        self.tmin = tk.Spinbox(self,from_=0,to=59,wrap=True,validate='focusout',validatecommand=(self.reg5,'%P'),invalidcommand=self.tmin_invalid,textvariable=self.tminstr,width=2)
+        self.tbutton=ttk.Button(self, text='To', command=self.tgetdate,state='disabled')
         self.fstr=tk.StringVar(self,self.date_format(self.fdate))
         self.flabel=tk.Label(self,textvariable=self.fstr,width=10)
         self.tstr=tk.StringVar(self,self.date_format(self.tdate))
@@ -160,7 +171,6 @@ class MainApplication(tk.Canvas):
         self.advanbutton['state']='disabled'
         self.hidden=True
         self.fqvar=tk.StringVar(self,value='1')
-        self.fqvar.trace('w',self.update)
         self.radb=tk.IntVar(self,2)
         self.OPTIONS=['Changes','Consumption','Average']
         self.optionvar=tk.StringVar(self)
@@ -169,58 +179,60 @@ class MainApplication(tk.Canvas):
         self.optionmenu.config(width=10)
         self.flag=tk.IntVar(self,0)
         self.flag.trace('w',self.callback)
-        self.default_text='MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN'
-        self.plabel=tk.Label(self,text=self.default_text)
+        self.container = tk.Frame(self)
+        self.listbox = tk.Listbox(self.container,width=85,height=20)
+        self.ysb = ttk.Scrollbar(self.container, orient='vertical',command=self.listbox.yview)
+        self.listbox.config(yscroll=self.ysb.set)
         self.cbutton=tk.Button(self,text="Create excel File!",command=self.extract,width=20,height=2)
         self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL,length=100,  mode='indeterminate')
     def fgetdate(self):
         def print_sel():
-            if self.cal.selection_get()<calendar.datetime.date.today():
+            if self.fcal.selection_get()<calendar.datetime.date.today():
                 self.flag.set(1)
-                self.fdate=self.cal.selection_get()
+                self.fdate=self.fcal.selection_get()
                 self.fstr.set(self.date_format(self.fdate))
-                self.top.destroy()
+                self.ftop.destroy()
             else:
                 messagebox.showerror("Date Error","Date is invalid. Try Again")
 
-        self.top = tk.Toplevel(self)
-        self.top.grab_set()
+        self.ftop = tk.Toplevel(self)
+        self.ftop.grab_set()
 
-        self.cal = Calendar(self.top, font="Arial 14", selectmode='day',
+        self.fcal = Calendar(self.ftop, font="Arial 14", selectmode='day',
                         cursor="hand1",year=self.fdate.year,month=self.fdate.month,day=self.fdate.day)
 
-        self.cal.pack(fill="both", expand=True)
-        ttk.Button(self.top, text="Go", command=print_sel).pack()
+        self.fcal.pack(fill="both", expand=True)
+        ttk.Button(self.ftop, text="Go", command=print_sel).pack()
     def tgetdate(self):
         def print_sel():
-            if self.cal.selection_get()>self.fdate and self.cal.selection_get()<=calendar.datetime.date.today():
+            if self.tcal.selection_get()>self.fdate and self.tcal.selection_get()<=calendar.datetime.date.today():
                 self.flag.set(0)
-                self.tdate=self.cal.selection_get()
+                self.tdate=self.tcal.selection_get()
                 self.tstr.set(self.date_format(self.tdate))
-                self.top.destroy()
+                self.ttop.destroy()
             else:
                 messagebox.showerror("Date Error","The time interval is invalid. Try Again")
-        self.top = tk.Toplevel(self)
-        self.top.grab_set()
-        self.cal = Calendar(self.top, font="Arial 14", selectmode='day',
+        self.ttop = tk.Toplevel(self)
+        self.ttop.grab_set()
+        self.tcal = Calendar(self.ttop, font="Arial 14", selectmode='day',
                         cursor="hand1",year=self.tdate.year,month=self.tdate.month,day=self.tdate.day)
-        self.cal.pack(fill="both", expand=True)
-        ttk.Button(self.top, text="Go", command=print_sel).pack()
+        self.tcal.pack(fill="both", expand=True)
+        ttk.Button(self.ttop, text="Go", command=print_sel).pack()
     def advance(self):
         if self.hidden:
             self.radiobutton1=tk.Radiobutton(self,text="Second(s)",value=1,variable=self.radb)
             self.radiobutton2=tk.Radiobutton(self,text="Minute(s)",value=2,variable=self.radb)
             self.radiobutton3=tk.Radiobutton(self,text="Hour(s)",value=3,variable=self.radb)
             self.fqentry=tk.Entry(self,width=2,textvariable=self.fqvar)
-            self.reg=self.register(self.valid)
-            self.fqentry.config(validate='key',validatecommand=(self.reg,'%P'))
+            self.reg1=self.register(self.freq_valid)
+            self.fqentry.config(validate='focusout',validatecommand=(self.reg1,'%P'),invalidcommand=self.freq_invalid)
             self.btn_text.set("Hide Advanced Options")
-            self.create_text(15,130,text="Show\t\t\tevery".expandtabs(11),fill='white',anchor='nw',font=("Arial",12,'bold'),tag='showtext') 
-            self.optionmenu.place(x=65,y=125) 
-            self.fqentry.place(x=230,y=133)
-            self.radiobutton1.place(x=260,y=130)
-            self.radiobutton2.place(x=340,y=130)
-            self.radiobutton3.place(x=420,y=130)
+            self.create_text(15,150,text="Show\t\t\tevery".expandtabs(11),fill='white',anchor='nw',font=("Arial",12,'bold'),tag='showtext') 
+            self.optionmenu.place(x=65,y=145) 
+            self.fqentry.place(x=230,y=153)
+            self.radiobutton1.place(x=260,y=150)
+            self.radiobutton2.place(x=340,y=150)
+            self.radiobutton3.place(x=420,y=150)
         else:
             self.btn_text.set("Show Advanced Options")
             self.delete('showtext')
@@ -234,16 +246,56 @@ class MainApplication(tk.Canvas):
     def callback(self,*args):
         if(self.flag.get()):
             self.tbutton.config(state='normal')
-    def update(self,*args):
-        if(self.fqvar.get()):
-            self.frequency=int(self.fqvar.get())
+    def fhour_invalid(self):
+        self.fhourstr.set('10')
+    def fhour_valid(self,input):
+        if (input.isdigit() and int(input) in range(24) and len(input) in range(1,3)):
+            valid = True
         else:
-            self.frequency=1
-    def valid(self,input):
-        if (input.isdigit() or input=='') and (len(input)<3):
-            return True
+            valid = False
+        if not valid:
+            self.fhour.after_idle(lambda: self.fhour.config(validate='focusout'))
+        return valid
+    def fmin_invalid(self):
+        self.fminstr.set('30')
+    def fmin_valid(self,input):
+        if (input.isdigit() and int(input) in range(60) and len(input) in range(1,3)):
+            valid = True
         else:
-            return False
+            valid = False
+        if not valid:
+            self.fmin.after_idle(lambda: self.fmin.config(validate='focusout'))
+        return valid
+    def thour_invalid(self):
+        self.thourstr.set('10')
+    def thour_valid(self,input):
+        if (input.isdigit() and int(input) in range(24) and len(input) in range(1,3)):
+            valid = True
+        else:
+            valid = False
+        if not valid:
+            self.thour.after_idle(lambda: self.thour.config(validate='focusout'))
+        return valid
+    def tmin_invalid(self):
+        self.tminstr.set('30')
+    def tmin_valid(self,input):
+        if (input.isdigit() and int(input) in range(60) and len(input) in range(1,3)):
+            valid = True
+        else:
+            valid = False
+        if not valid:
+            self.tmin.after_idle(lambda: self.tmin.config(validate='focusout'))
+        return valid
+    def freq_invalid(self):
+        self.fqvar.set('1')
+    def freq_valid(self,input):
+        if (input.isdigit()) and (len(input)<3):
+            valid = True
+        else:
+            valid = False
+        if not valid:
+            self.fqentry.after_idle(lambda: self.fqentry.config(validate='focusout'))
+        return valid
     def disable_all(self):
         self.cbutton['state']='disabled'
         self.advanbutton['state']='disabled'

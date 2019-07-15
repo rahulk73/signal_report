@@ -3,6 +3,7 @@ class Node:
     def __init__(self,data,parent=None):
         self.data=data
         self.children=[]
+        self.absolute_path=''
         if parent:
             parent.children.append(self)
     def getChildrenData(self):
@@ -56,4 +57,4 @@ class Tree:
 if __name__ == "__main__":
     signals=GetSignals()
     tree=Tree(signals.result)
-    print(tree.getRoot()[0])
+    print(tree.getRoot()['Meter'].isInternalNode())

@@ -33,6 +33,7 @@ try:
     from tkinter import messagebox
     from tkinter import ttk
     from tkinter.font import Font
+    from ttkwidgets import CheckboxTreeview
 except ImportError:
     import Tkinter as tk
     import ttk
