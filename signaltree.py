@@ -39,7 +39,7 @@ class Tree:
         'cs_busbarvchoice_sps','cs_acceptforcing_sps','groupsps','tapfct','cs_voltagepresence_sps','cs_closeorderstate_sps','userfunctionsps',
         'cs_voltagerefabsence_sps','moduledps','modulesps'])
         self.measurement = frozenset(['modulemv'])
-        self.meter = frozenset(['modulemeter'])
+        self.meter = frozenset(['modulecounter'])
         self.root={'All':{'site':Node('Electrical'),'scs':Node('System')}, 'Control':Node('Electrical-Control'), 'Measurement':Node('Electrical-Measurement'),
         'Meter':Node('Electrical-Meter')}
         for fullpath,typ0,typ5,iec in data_tuples:

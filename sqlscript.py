@@ -15,6 +15,7 @@ class GetSignalData:
         'cs_busbarvchoice_sps','cs_acceptforcing_sps','groupsps','tapfct','cs_voltagepresence_sps','cs_closeorderstate_sps','userfunctionsps',
         'cs_voltagerefabsence_sps','moduledps','modulesps']),'All Controls': frozenset(['modulespc','switch_dpc','cs_ctrlonoff_spc','moduledpc']),
         'All Measurements':frozenset(['modulemv']),'All Metering':frozenset(['modulemeter'])}
+        self.object_fullpath = object_fullpath
         self.result=()
         self.connection=pymysql.connect(host='localhost',user='mcisadmin',password='s$e!P!C!L@2014',db='pacis')
         try:
@@ -30,7 +31,7 @@ class GetSignalData:
                         break   
                 if self.uid:
                     if signal_type  == 'All Measurements':
-                        self.sql="SELECT * FROM "+str(self.uid)[-2:]
+                        self.sql="SELECT * FROM values_"+str(self.uid)[-2:]
                         cursor.execute(self.sql)
                         self.result=generator(cursor)
                     else:
@@ -60,7 +61,8 @@ class GetSignals:
 
 if __name__ == "__main__":
     #data=GetSignalData('MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
-    data=GetSignalData('MOSG / 33KV / H32_T30 (LV) INC / BCU SYNCROCHECK / ON/OFF SPS','All Signals')
+    # data=GetSignalData('MOSG / 33KV / H32_T30 (LV) INC / BCU SYNCROCHECK / ON/OFF SPS','All Signals')
     #data=GetSignals()
+    data=GetSignalData('MOSG / 33KV / H03_CABLEFDR-H16 / MEASUREMENT / VOLTAGE VBR','All Measurements')
     print(data.result)
-    print(next(data.result))
+    # print(next(data.result))

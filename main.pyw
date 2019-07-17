@@ -60,13 +60,14 @@ class Navbar(tk.Frame):
         self.tree.delete(*self.root_iid)
         self.parent.listbox.delete(0,tk.END)
         self.root_iid=[]
-        if self.optionvar.get() != 'All Measurements':
+        self.parent.optionmenu_mt.place_forget()
+        self.parent.optionmenu_mv.place_forget()
+        if self.optionvar.get() in self.OPTIONS[:-2]:
             self.parent.advanbutton['state']='disabled'
             if not self.parent.hidden:
                 self.parent.btn_text.set("Show Advanced Options")
                 self.parent.delete('showtext')
                 self.parent.fqentry.place_forget()
-                self.parent.optionmenu.place_forget()
                 self.parent.radiobutton1.place_forget()
                 self.parent.radiobutton2.place_forget()
                 self.parent.radiobutton3.place_forget()
@@ -76,11 +77,18 @@ class Navbar(tk.Frame):
             elif self.optionvar.get() == 'All Signals':
                 self.build_tree('', self.all_electrical,self.all_electrical.data,root=True)
                 self.build_tree('', self.all_system,self.all_system.data,root=True)
-            elif self.optionvar.get()=='All Metering':
-                self.build_tree('', self.meter,self.meter.data,root=True)
-        else:
-            self.parent.advanbutton['state']='normal'
+            return
+        elif self.optionvar.get() == 'All Measurements':
+            if not self.parent.hidden:
+                self.parent.optionmenu_mv.place(x=65,y=145)
             self.build_tree('',self.measurement,self.measurement.data,root=True)
+        elif self.optionvar.get()=='All Metering':
+            if not self.parent.hidden:
+                self.parent.optionmenu_mt.place(x=65,y=145)
+            self.build_tree('', self.meter,self.meter.data,root=True)
+        
+        self.parent.advanbutton['state']='normal'
+
 
 class MainApplication(tk.Canvas):
     def __init__(self,parent):
@@ -113,37 +121,36 @@ class MainApplication(tk.Canvas):
             self.progress.start()
             self.object_fullpaths=self.listbox.get(0,tk.END)
             if self.hidden:
-                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhourstr),int(self.fminstr)),
-                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thourstr),int(self.tminstr)),
+                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhourstr.get()),int(self.fminstr.get())),
+                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thourstr.get()),int(self.tminstr.get())),
                 self.hidden,self.object_fullpaths,self.navbar.optionvar.get())
                 found=extraction.result
             else:
-                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhourstr),int(self.fminstr)),
-                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thourstr),int(self.tminstr)),
+                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhourstr.get()),int(self.fminstr.get())),
+                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thourstr.get()),int(self.tminstr.get())),
                 self.hidden,self.object_fullpath,self.navbar.optionvar.get(),
                 self.fqentry.get(),self.radb.get(),self.optionvar.get())
                 found=extraction.result       
             self.progress.stop()
             self.progress.place_forget()
             self.enable_all()
-            if found==-1:
-                tk.messagebox.showerror("Error","Close the excel file and try again.")
+            if found==-3:
+                tk.messagebox.showerror("Error","Too much data to process. Narrow down your search criteria and try again")
             elif found==-2:
                 tk.messagebox.showerror("Error","Something went wrong. Restart the application and try again.")
-            elif found==-3:
-                tk.messagebox.showwarning("Info","No data was found for the signal.")
-            elif found==-4:
-                tk.messagebox.showerror("Error","Too much data to process. Narrow down your search criteria and try again")
+            elif found==-1:
+                tk.messagebox.showerror("Error","Close the excel file and try again.")
             elif found==0:
-                tk.messagebox.showwarning("Info","No data was found for the signal in the selected time period.")
+                tk.messagebox.showwarning("Info","No data was found for the selected signal(s).")
             elif found==1:
                 tk.messagebox.showinfo("Extraction Successful !","You can view the records in the file tables.xlsx")
                 system("start EXCEL.EXE \"./SignalLog/"+extraction.str_time+".xlsx\"")
+            elif found==2:
+                tk.messagebox.showwarning("Info","Records for the following data could not be found-\n"+','.join([extraction.not_found]))
         self.disable_all()        
         threading.Thread(target=thread_extract).start()
         
     def setup(self):
-        #self.tdate=datetime.datetime.combine(calendar.datetime.date.today(),datetime.time(12,30))
         self.tdate = calendar.datetime.date.today()
         self.fdate=calendar.datetime.date(self.tdate.year,self.tdate.month,self.tdate.day)+datetime.timedelta(days=-2)
         self.fbutton=ttk.Button(self, text='From', command=self.fgetdate,underline=1)
@@ -155,6 +162,7 @@ class MainApplication(tk.Canvas):
         self.thour = tk.Spinbox(self,from_=0,to=23,wrap=True,textvariable=self.thourstr,width=2,state='readonly')
         self.tminstr=tk.StringVar(self,'30')
         self.tmin = tk.Spinbox(self,from_=0,to=59,wrap=True,textvariable=self.tminstr,width=2,state='readonly')
+        self.prev_valid = [self.fhourstr.get(),self.fminstr.get(),self.thourstr.get(),self.tminstr.get()]
         self.tbutton=ttk.Button(self, text='To', command=self.tgetdate)
         self.fstr=tk.StringVar(self,self.date_format(self.fdate))
         self.flabel=tk.Label(self,textvariable=self.fstr,width=10)
@@ -169,11 +177,16 @@ class MainApplication(tk.Canvas):
         self.hidden=True
         self.fqvar=tk.StringVar(self,value='1')
         self.radb=tk.IntVar(self,2)
-        self.OPTIONS=['Changes','Consumption','Average']
-        self.optionvar=tk.StringVar(self)
-        self.optionvar.set(self.OPTIONS[0])
-        self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS)
-        self.optionmenu.config(width=10)
+        self.OPTIONS_MEASUREMENT=['Changes','Average']
+        self.OPTIONS_METERING = ['Changes','Consumption']
+        self.optionvar_mv=tk.StringVar(self)
+        self.optionvar_mv.set(self.OPTIONS_MEASUREMENT[0])
+        self.optionmenu_mv=tk.OptionMenu(self,self.optionvar_mv,*self.OPTIONS_MEASUREMENT)
+        self.optionmenu_mv.config(width=10)
+        self.optionvar_mt = tk.StringVar(self)
+        self.optionvar_mt.set(self.OPTIONS_METERING[0])
+        self.optionmenu_mt =tk.OptionMenu(self,self.optionvar_mt,*self.OPTIONS_METERING)
+        self.optionmenu_mt.config(width=10)
         self.flag=tk.IntVar(self,0)
         self.from_within = 0
         self.flag.trace('w',self.flag_callback)
@@ -190,9 +203,11 @@ class MainApplication(tk.Canvas):
     def fgetdate(self):
         def print_sel():
             if self.datetimecheck(fdate=self.fcal.selection_get()):
-                self.flag.set(1)
+                self.flag.set(0)
                 self.fdate=self.fcal.selection_get()
+                self.tdate = self.fdate
                 self.fstr.set(self.date_format(self.fdate))
+                self.tstr.set(self.date_format(self.tdate))
                 self.ftop.destroy()
             else:
                 self.flag.set(1)
@@ -216,7 +231,7 @@ class MainApplication(tk.Canvas):
         self.ttop = tk.Toplevel(self)
         self.ttop.grab_set()
         self.tcal = Calendar(self.ttop, font="Arial 14", selectmode='day',
-                        cursor="hand1",year=self.tdate.year,month=self.tdate.month,day=self.tdate.day)
+                        cursor="hand1",year=self.fdate.year,month=self.fdate.month,day=self.fdate.day)
         self.tcal.pack(fill="both", expand=True)
         ttk.Button(self.ttop, text="Go", command=print_sel).pack()
     def advance(self):
@@ -228,8 +243,11 @@ class MainApplication(tk.Canvas):
             self.reg1=self.register(self.freq_valid)
             self.fqentry.config(validate='focusout',validatecommand=(self.reg1,'%P'),invalidcommand=self.freq_invalid)
             self.btn_text.set("Hide Advanced Options")
-            self.create_text(15,150,text="Show\t\t\tevery".expandtabs(11),fill='white',anchor='nw',font=("Arial",12,'bold'),tag='showtext') 
-            self.optionmenu.place(x=65,y=145) 
+            self.create_text(15,150,text="Show\t\t\tevery".expandtabs(11),fill='white',anchor='nw',font=("Arial",12,'bold'),tag='showtext')
+            if self.navbar.optionvar.get() == 'All Measurements':
+                self.optionmenu_mv.place(x=65,y=145)
+            else:
+                self.optionmenu_mt.place(x=65,y=145) 
             self.fqentry.place(x=230,y=153)
             self.radiobutton1.place(x=260,y=150)
             self.radiobutton2.place(x=340,y=150)
@@ -240,7 +258,8 @@ class MainApplication(tk.Canvas):
             self.fqentry.place_forget()
             self.radiobutton1.place_forget()
             self.radiobutton2.place_forget()
-            self.optionmenu.place_forget()
+            self.optionmenu_mv.place_forget()
+            self.optionmenu_mt.place_forget()
             self.radiobutton3.place_forget()
         self.hidden = not self.hidden
     def datetimecheck(self,fdate=None,tdate=None):
@@ -263,15 +282,18 @@ class MainApplication(tk.Canvas):
         if self.flag.get() == 1:
             messagebox.showerror("Date Error","The time interval is invalid. Try Again")
     def time_callback(self,*agrs):
-        if (not self.from_within) and (not self.datetimecheck()):
-            self.flag.set(1)
-            self.from_within=1
-            self.fhourstr.set(str((datetime.datetime.now()+datetime.timedelta(hours=-2)).hour))
-            self.fminstr.set('30')
-            self.thourstr.set(str((datetime.datetime.now()+datetime.timedelta(hours=-1)).hour))
-            self.tminstr.set('30')
-            self.from_within=0
-            self.flag.set(0)
+        if not self.from_within:
+            if not self.datetimecheck():
+                self.flag.set(1)
+                self.from_within=1
+                self.fhourstr.set(self.prev_valid[0])
+                self.fminstr.set(self.prev_valid[1])
+                self.thourstr.set(self.prev_valid[2])
+                self.tminstr.set(self.prev_valid[3])
+                self.from_within=0
+                self.flag.set(0)
+            else:
+                self.prev_valid=[self.fhourstr.get(),self.fminstr.get(),self.thourstr.get(),self.tminstr.get()]
     def freq_invalid(self):
         self.fqvar.set('1')
     def freq_valid(self,input):
@@ -292,7 +314,7 @@ class MainApplication(tk.Canvas):
             self.radiobutton2['state']='disabled'
             self.radiobutton3['state']='disabled'
             self.fqentry['state']='disabled'
-            self.optionmenu['state']='disabled'
+            self.optionmenu_mv['state']='disabled'
     def enable_all(self):
         self.cbutton['state']='normal'
         self.advanbutton['state']='normal'
@@ -302,7 +324,7 @@ class MainApplication(tk.Canvas):
             self.radiobutton2['state']='normal'
             self.radiobutton3['state']='normal'
             self.fqentry['state']='normal'
-            self.optionmenu['state']='normal'
+            self.optionmenu_mv['state']='normal'
     def date_format(self,date):
         return(str(datetime.datetime.strptime(str(date),"%Y-%m-%d").strftime("%d/%m/%Y")))
 if  __name__=='__main__':
