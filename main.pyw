@@ -10,7 +10,6 @@ from xlsscript import ParseData
 from sqlscript import GetSignals
 from signaltree import Tree,Node
 import threading
-from functools import partial
 from os import system
 w=1400
 h=700
@@ -117,23 +116,22 @@ class MainApplication(tk.Canvas):
         self.cbutton.place(x=150,y=560)
     def extract(self):
         def thread_extract():
-            self.progress.place(x=200,y=300)
+            self.progress.place(x=400,y=560)
             self.progress.start()
             self.object_fullpaths=self.listbox.get(0,tk.END)
             if self.hidden:
-                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhourstr.get()),int(self.fminstr.get())),
-                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thourstr.get()),int(self.tminstr.get())),
+                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get())),
+                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get())),
                 self.hidden,self.object_fullpaths,self.navbar.optionvar.get())
                 found=extraction.result
             else:
-                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhourstr.get()),int(self.fminstr.get())),
-                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thourstr.get()),int(self.tminstr.get())),
+                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get())),
+                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get())),
                 self.hidden,self.object_fullpath,self.navbar.optionvar.get(),
                 self.fqentry.get(),self.radb.get(),self.optionvar.get())
                 found=extraction.result       
             self.progress.stop()
             self.progress.place_forget()
-            self.enable_all()
             if found==-3:
                 tk.messagebox.showerror("Error","Too much data to process. Narrow down your search criteria and try again")
             elif found==-2:
@@ -146,29 +144,39 @@ class MainApplication(tk.Canvas):
                 tk.messagebox.showinfo("Extraction Successful !","You can view the records in the file tables.xlsx")
                 system("start EXCEL.EXE \"./SignalLog/"+extraction.str_time+".xlsx\"")
             elif found==2:
-                tk.messagebox.showwarning("Info","Records for the following data could not be found-\n"+','.join([extraction.not_found]))
+                tk.messagebox.showwarning("Info","Records for the following data could not be found-\n"+',\n'.join(extraction.not_found))
+        if not self.datetimecheck():
+            messagebox.showerror("Date Error","The time interval is invalid. Try Again")
+            return
         self.disable_all()        
         threading.Thread(target=thread_extract).start()
+        self.enable_all()
         
     def setup(self):
-        self.tdate = calendar.datetime.date.today()
-        self.fdate=calendar.datetime.date(self.tdate.year,self.tdate.month,self.tdate.day)+datetime.timedelta(days=-2)
+        self.to_datetime = datetime.datetime.now()
+        self.from_datetime = self.to_datetime +datetime.timedelta(hours=-1)
+        self.tdate = calendar.datetime.date(self.to_datetime.year,self.to_datetime.month,self.to_datetime.day)
+        self.fdate=calendar.datetime.date(self.from_datetime.year,self.from_datetime.month,self.from_datetime.day)
         self.fbutton=ttk.Button(self, text='From', command=self.fgetdate,underline=1)
-        self.fhourstr=tk.StringVar(self,str((datetime.datetime.now()+datetime.timedelta(hours=-2)).hour))
-        self.fhour = tk.Spinbox(self,from_=0,to=23,wrap=True,textvariable=self.fhourstr,width=2,state='readonly')
-        self.fminstr=tk.StringVar(self,'30')
-        self.fmin = tk.Spinbox(self,from_=0,to=59,wrap=True,textvariable=self.fminstr,width=2,state='readonly')
-        self.thourstr=tk.StringVar(self,str((datetime.datetime.now()+datetime.timedelta(hours=-1)).hour))
-        self.thour = tk.Spinbox(self,from_=0,to=23,wrap=True,textvariable=self.thourstr,width=2,state='readonly')
-        self.tminstr=tk.StringVar(self,'30')
-        self.tmin = tk.Spinbox(self,from_=0,to=59,wrap=True,textvariable=self.tminstr,width=2,state='readonly')
-        self.prev_valid = [self.fhourstr.get(),self.fminstr.get(),self.thourstr.get(),self.tminstr.get()]
+        vcmd = (self.register(self.onValidate),'%P','%W')
+        self.fhour = tk.Spinbox(self,from_=0,to=23,wrap=True,width=2,validatecommand=vcmd,validate='key',name='from_hour')
+        self.fmin = tk.Spinbox(self,from_=0,to=59,wrap=True,width=2,validatecommand=vcmd,validate='key',name='from_min')
+        self.thour = tk.Spinbox(self,from_=0,to=23,wrap=True,width=2,validatecommand=vcmd,validate='key',name='to_hour')
+        self.tmin = tk.Spinbox(self,from_=0,to=59,wrap=True,width=2,validatecommand=vcmd,validate='key',name='to_min')
+        self.fhour.delete(0,'end')
+        self.fhour.insert(0,self.from_datetime.hour)
+        self.fmin.delete(0,'end')
+        self.fmin.insert(0,self.from_datetime.minute)
+        self.thour.delete(0,'end')
+        self.thour.insert(0,self.to_datetime.hour)
+        self.tmin.delete(0,'end')
+        self.tmin.insert(0,self.to_datetime.minute)
         self.tbutton=ttk.Button(self, text='To', command=self.tgetdate)
         self.fstr=tk.StringVar(self,self.date_format(self.fdate))
         self.flabel=tk.Label(self,textvariable=self.fstr,width=10)
         self.tstr=tk.StringVar(self,self.date_format(self.tdate))
         self.tlabel=tk.Label(self,textvariable=self.tstr,width=10)
-        self.photoimage=tk.PhotoImage(file="C:\\Users\\OISM\\Desktop\\sqlApp\\bgimage.png")
+        self.photoimage=tk.PhotoImage(file="C:\\Users\\OISM\\Desktop\\SignalReportApp\\bgimage.png")
         self.parent.geometry("%dx%d" % (w,h))
         self.parent.title("Create Exel Log File")
         self.btn_text=tk.StringVar(self,value="Show Advanced Options")
@@ -187,13 +195,6 @@ class MainApplication(tk.Canvas):
         self.optionvar_mt.set(self.OPTIONS_METERING[0])
         self.optionmenu_mt =tk.OptionMenu(self,self.optionvar_mt,*self.OPTIONS_METERING)
         self.optionmenu_mt.config(width=10)
-        self.flag=tk.IntVar(self,0)
-        self.from_within = 0
-        self.flag.trace('w',self.flag_callback)
-        self.fhourstr.trace('w',self.time_callback)
-        self.fminstr.trace('w',self.time_callback)
-        self.thourstr.trace('w',self.time_callback)
-        self.tminstr.trace('w',self.time_callback)
         self.container = tk.Frame(self)
         self.listbox = tk.Listbox(self.container,width=85,height=20)
         self.ysb = ttk.Scrollbar(self.container, orient='vertical',command=self.listbox.yview)
@@ -202,15 +203,11 @@ class MainApplication(tk.Canvas):
         self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL,length=100,  mode='indeterminate')
     def fgetdate(self):
         def print_sel():
-            if self.datetimecheck(fdate=self.fcal.selection_get()):
-                self.flag.set(0)
-                self.fdate=self.fcal.selection_get()
-                self.tdate = self.fdate
-                self.fstr.set(self.date_format(self.fdate))
-                self.tstr.set(self.date_format(self.tdate))
-                self.ftop.destroy()
-            else:
-                self.flag.set(1)
+            self.fdate=self.fcal.selection_get()
+            self.tdate = self.fdate
+            self.fstr.set(self.date_format(self.fdate))
+            self.tstr.set(self.date_format(self.tdate))
+            self.ftop.destroy()
         self.ftop = tk.Toplevel(self)
         self.ftop.grab_set()
 
@@ -221,13 +218,9 @@ class MainApplication(tk.Canvas):
         ttk.Button(self.ftop, text="Go", command=print_sel).pack()
     def tgetdate(self):
         def print_sel():
-            if self.datetimecheck(tdate=self.tcal.selection_get()):
-                self.flag.set(0)
-                self.tdate=self.tcal.selection_get()
-                self.tstr.set(self.date_format(self.tdate))
-                self.ttop.destroy()
-            else:
-                self.flag.set(1)
+            self.tdate=self.tcal.selection_get()
+            self.tstr.set(self.date_format(self.tdate))
+            self.ttop.destroy()
         self.ttop = tk.Toplevel(self)
         self.ttop.grab_set()
         self.tcal = Calendar(self.ttop, font="Arial 14", selectmode='day',
@@ -241,7 +234,8 @@ class MainApplication(tk.Canvas):
             self.radiobutton3=tk.Radiobutton(self,text="Hour(s)",value=3,variable=self.radb)
             self.fqentry=tk.Entry(self,width=2,textvariable=self.fqvar)
             self.reg1=self.register(self.freq_valid)
-            self.fqentry.config(validate='focusout',validatecommand=(self.reg1,'%P'),invalidcommand=self.freq_invalid)
+            self.fqentry.config(validate='key',validatecommand=(self.reg1,'%P'))
+            self.fqentry.bind('<FocusOut>',self.freq_focusout)
             self.btn_text.set("Hide Advanced Options")
             self.create_text(15,150,text="Show\t\t\tevery".expandtabs(11),fill='white',anchor='nw',font=("Arial",12,'bold'),tag='showtext')
             if self.navbar.optionvar.get() == 'All Measurements':
@@ -262,48 +256,38 @@ class MainApplication(tk.Canvas):
             self.optionmenu_mt.place_forget()
             self.radiobutton3.place_forget()
         self.hidden = not self.hidden
-    def datetimecheck(self,fdate=None,tdate=None):
-        fhour = int(self.fhourstr.get())
-        fmin = int(self.fminstr.get())
-        thour = int(self.thourstr.get())
-        tmin = int(self.tminstr.get())
-        if fdate:
-            return (datetime.datetime.combine(fdate,datetime.time(hour=fhour,minute=fmin))<
-            datetime.datetime.combine(self.tdate,datetime.time(hour=thour,minute=tmin)))
-        elif tdate:
-            return (datetime.datetime.combine(self.fdate,datetime.time(hour=fhour,minute=fmin))<
-            datetime.datetime.combine(tdate,datetime.time(hour=thour,minute=tmin)) and datetime.datetime.combine(tdate,datetime.time(hour=thour,minute=tmin))
+    def datetimecheck(self):
+        if self.fhour.get() and self.fmin.get() and self.thour.get() and self.tmin.get():
+            return (datetime.datetime.combine(self.fdate,datetime.time(hour=int(self.fhour.get()),minute=int(self.fmin.get())))
+            <(datetime.datetime.combine(self.tdate,datetime.time(hour=int(self.thour.get()),minute=int(self.tmin.get()))))
             <=datetime.datetime.now())
-        else:
-            return (datetime.datetime.combine(self.fdate,datetime.time(hour=fhour,minute=fmin))<
-            datetime.datetime.combine(self.tdate,datetime.time(hour=thour,minute=tmin)) and datetime.datetime.combine(self.tdate,datetime.time(hour=thour,minute=tmin))
-            <=datetime.datetime.now())
-    def flag_callback(self,*args):
-        if self.flag.get() == 1:
-            messagebox.showerror("Date Error","The time interval is invalid. Try Again")
-    def time_callback(self,*agrs):
-        if not self.from_within:
-            if not self.datetimecheck():
-                self.flag.set(1)
-                self.from_within=1
-                self.fhourstr.set(self.prev_valid[0])
-                self.fminstr.set(self.prev_valid[1])
-                self.thourstr.set(self.prev_valid[2])
-                self.tminstr.set(self.prev_valid[3])
-                self.from_within=0
-                self.flag.set(0)
+        return False
+    def onValidate(self,P,W):
+        called_by=W.split('.')[-1]
+        if called_by in ['from_hour','to_hour']:
+            if P.isdigit() and int(P) in range(24):
+                return True
+            elif P=='':
+                return True
             else:
-                self.prev_valid=[self.fhourstr.get(),self.fminstr.get(),self.thourstr.get(),self.tminstr.get()]
-    def freq_invalid(self):
-        self.fqvar.set('1')
+                return False
+        else:
+            if P.isdigit() and int(P) in range(60):
+                return True
+            elif P=='':
+                return True
+            else:
+                return False
     def freq_valid(self,input):
         if (input.isdigit()) and (len(input)<3):
-            valid = True
+            return True
+        elif input == '':
+            return True
         else:
-            valid = False
-        if not valid:
-            self.fqentry.after_idle(lambda: self.fqentry.config(validate='focusout'))
-        return valid
+            return False
+    def freq_focusout(self,*args):
+        if self.fqvar.get() == '':
+            self.fqvar.set(1)
     def disable_all(self):
         self.cbutton['state']='disabled'
         self.advanbutton['state']='disabled'

@@ -65,4 +65,4 @@ if __name__ == "__main__":
     #data=GetSignals()
     data=GetSignalData('MOSG / 33KV / H03_CABLEFDR-H16 / MEASUREMENT / VOLTAGE VBR','All Measurements')
     print(data.result)
-    # print(next(data.result))
+    print(next(data.result))
