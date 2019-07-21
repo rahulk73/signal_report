@@ -39,7 +39,7 @@ class ParseData:
                 self.data=[]
                 self.unparsed_data = signal.result
                 self.uid = signal.uid
-                if not self.unparsed_data or self.unparsed_data==-2:
+                if not self.unparsed_data:
                     self.all_signal_data.append([])
                     continue
                 elif signal_type in ['All Measurements','All Metering']:
@@ -237,7 +237,10 @@ class ParseData:
 
 if __name__ == "__main__":
   #a=ParseData(datetime.datetime(2019,5,28),datetime.datetime(2019,5,30),2,1,False,'MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
-  b=ParseData(datetime.datetime(2019,5,29,9,0),datetime.datetime(2019,6,10,9,1),False,['MOSG / 33KV / H03_CABLEFDR-H16 / MEASUREMENT / VOLTAGE VBR','MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN'],'All Measurements',1,1,'Average')
+  #b=ParseData(datetime.datetime(2019,5,29,9,0),datetime.datetime(2019,6,10,9,1),False,['MOSG / 33KV / H03_CABLEFDR-H16 / MEASUREMENT / VOLTAGE VBR','MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN'],'All Measurements',1,1,'Average')
   #b=ParseData(datetime.datetime(2019,5,28),datetime.datetime(2019,7,6),1,1,True,'MOSG / 33KV / H38_39 BUS SEC / GIS SIGNALS / GIS VT  MCB TRIP','All Signals')
+  b=ParseData(datetime.datetime(2019,7,9,14,5),datetime.datetime(2019,7,9,14,14),False,['MOSG / 33KV / H38_39 BUS SEC / MEASUREMENT / ACTIVE POWER(P)',
+  'MOSG / 33KV / H38_39 BUS SEC / MEASUREMENT / FREQUENCY',
+  'MOSG / 33KV / H38_39 BUS SEC / MEASUREMENT / CURRENT IB'],'All Measurements',5,1,'Average') #19,25,4
   print(b.result)
  

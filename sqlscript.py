@@ -19,7 +19,7 @@ class GetSignalData:
         self.result=()
         self.connection=pymysql.connect(host='localhost',user='mcisadmin',password='s$e!P!C!L@2014',db='pacis')
         try:
-            self.result = 0
+            self.result = None
             with self.connection.cursor() as cursor:
                 self.sql = "select object_typ5,object_uid32 from objects where object_fullpath='{}'".format(object_fullpath)
                 cursor.execute(self.sql)
@@ -30,14 +30,17 @@ class GetSignalData:
                         self.uid=row[1]
                         break   
                 if self.uid:
-                    if signal_type  == 'All Measurements':
-                        self.sql="SELECT * FROM values_"+str(self.uid)[-2:]
+                    if signal_type in ['All Measurements','All Meteging']:
+                        num = int(str(self.uid)[-2:])
+                        self.sql="SELECT * FROM values_"+str(num)
                         cursor.execute(self.sql)
                         self.result=generator(cursor)
                     else:
                         self.sql="select event_datetime,event_millisec,event_object_uid32,event_mess,event_userslogged from `events` where event_object_uid32={}".format(self.uid)
                         cursor.execute(self.sql)
                         self.result=generator(cursor)
+        except pymysql.err.ProgrammingError:
+            self.result = None
         except Exception as e:
             print(e)
             self.result= -2
