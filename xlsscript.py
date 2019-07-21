@@ -1,7 +1,8 @@
-from openpyxl import Workbook
+from openpyxl import Workbook,load_workbook
 from openpyxl.worksheet.table import Table,TableStyleInfo
 from openpyxl.styles import Alignment,Font,PatternFill
 import openpyxl.utils.cell as cell
+from shutil import copyfile
 import datetime
 import re
 from sqlscript import GetSignalData 
@@ -27,9 +28,11 @@ class Increment():
 class ExcessiveDataError(Exception):
     pass
 class ParseData:
-    def __init__(self,fdate,tdate,hidden,object_fullpaths,signal_type,fq=None,radb=None,data_type='Changes'):
+    def __init__(self,fdate,tdate,hidden,object_fullpaths,signal_type,fq=None,radb=None,data_type='Changes',template_path=None):
         try:
             self.str_time=datetime.datetime.now().strftime('%a %d %b %y %I-%M-%S%p')
+            self.file_path = './SignalLog/'+self.str_time+'.xlsx'
+            self.template_path = template_path
             self.signal_info=[]
             self.all_signal_data=[]
             self.object_fullpaths = list(object_fullpaths)
@@ -116,6 +119,7 @@ class ParseData:
                 self.all_signal_data.append(self.data)
             if not self.isListEmpty(self.all_signal_data):
                 self.create_table(signal_type,data_type)
+                self.populate_table()
                 if self.not_found:
                     self.result = 2
                 else:
@@ -129,13 +133,16 @@ class ParseData:
         except Exception as e:
             self.result = -2
             print(e)
+    def populate_table(self):
+        pass
+
     def create_table(self,signal_type,data_type):
         def header_build(step,column=3):
             for i,path in enumerate(self.object_fullpaths,start=1):
                 for j in range(step):
                     self.ws.column_dimensions[cell.get_column_letter(column+j)].width=25
-                base_cell = self.ws.cell(row=1, column=column)
-                self.ws.merge_cells(start_row=1,end_row=3,start_column=column,end_column=column+step-1)
+                base_cell = self.ws.cell(row=self.cur_row, column=column)
+                self.ws.merge_cells(start_row=self.cur_row,end_row=self.cur_row+2,start_column=column,end_column=column+step-1)
                 base_cell.value = path
                 base_cell.alignment = align_head
                 if i%2:            
@@ -146,8 +153,8 @@ class ParseData:
                     base_cell.fill = fill_head
                 self.ws.column_dimensions.group(cell.get_column_letter(column),cell.get_column_letter(column+step-1),hidden=False,outline_level=i)
                 column+=step
-            self.ws.cell(row=4,column=1,value='Date')
-            self.ws.cell(row=4,column=2,value='Time')
+            self.ws.cell(row=self.cur_row+3,column=1,value='Date')
+            self.ws.cell(row=self.cur_row+3,column=2,value='Time')
             self.ws.column_dimensions['A'].width=15
             self.ws.column_dimensions['B'].width=15
         def type1(step=4):
@@ -155,30 +162,24 @@ class ParseData:
             column = 3
             for i,field in enumerate([['Value Meantype-','Value Object UID-','Value Quality-','Value-']]*len(self.object_fullpaths),start=1):
                 for j in range(step):
-                    self.ws.cell(row=4,column=column+j,value=field[j]+str(i))
+                    self.ws.cell(row=self.cur_row+3,column=column+j,value=field[j]+str(i))
                 column+=step
-            for row in self.zipped_data:
-                self.ws.append(row)
             return step
         def type2(step=5):
             header_build(step)
             column = 3
             for i,field in enumerate([['Value Meantype-','Value Object UID-','Value Quality-','Value-','Value Consumption-']]*len(self.object_fullpaths),start=1):
                 for j in range(step):
-                    self.ws.cell(row=4,column=column+j,value=field[j]+str(i))
+                    self.ws.cell(row=self.cur_row+3,column=column+j,value=field[j]+str(i))
                 column+=step
-            for row in self.zipped_data:
-                self.ws.append(row)
             return step
         def type3(step=7):
             header_build(step)
             column = 3
             for i,field in enumerate([['Value Meantype-','Value Object UID-','Value Quality-','Value-','Value Average-','Value Max-','Value Min-']]*len(self.object_fullpaths),start=1):
                 for j in range(step):
-                    self.ws.cell(row=4,column=column+j,value=field[j]+str(i))
+                    self.ws.cell(row=self.cur_row+3,column=column+j,value=field[j]+str(i))
                 column+=step
-            for row in self.zipped_data:
-                self.ws.append(row)
             return step
         def type4(step=2):
             self.ws.append(['Date','Time','Event Mess','Event Userlooked'],start=1)
@@ -186,14 +187,16 @@ class ParseData:
             column = 3
             for i,field in enumerate([['Value Meantype-','Value Object UID-','Value Quality-','Value Value-']]*len(self.object_fullpaths)):
                 for j in range(step):
-                    self.ws.cell(row=4,column=column+j,value=field[j]+str(i))
+                    self.ws.cell(row=self.cur_row+3,column=column+j,value=field[j]+str(i))
                 column+=step
-            for row in self.zipped_data:
-                self.ws.append(row)
             return step
-
-        self.wb = Workbook()
+        if self.template_path:
+            copyfile(self.template_path,self.file_path)
+            self.wb = load_workbook(filename=self.file_path)
+        else:
+            self.wb = Workbook()
         self.ws = self.wb.active
+        self.cur_row = self.ws.max_row+2
         font_head =  Font(b=True,color="4EB1BA",sz=15)
         alt_font_head = Font(b=True,color='FFFFFF',sz=15)
         align_head = Alignment(horizontal='center',vertical='center')
@@ -202,6 +205,7 @@ class ParseData:
         self.zipped_data = []
         self.not_found=[]
         table_type = {'All Measurements':{'Changes':type1,'Consumption':type2,'Average':type3}}
+
         for index,signal_data in enumerate(self.all_signal_data):
             if signal_data and self.zipped_data == []:
                 self.zipped_data = signal_data
@@ -210,11 +214,15 @@ class ParseData:
             elif not signal_data:
                 self.not_found.append(self.object_fullpaths.pop(index))
         step = table_type.get(signal_type,dict()).get(data_type,type4)()
-        tab = Table(displayName='Report',ref="A4:"+cell.get_column_letter(2+len(self.object_fullpaths)*step)+str(len(self.zipped_data)+4))
+
+        for row in self.zipped_data:
+            self.ws.append(row)
+
+        tab = Table(displayName='Report',ref="A"+str(self.cur_row+3)+":"+cell.get_column_letter(2+len(self.object_fullpaths)*step)+str(len(self.zipped_data)+4))
         style = TableStyleInfo(name='TableStyleMedium9',showColumnStripes=True,showRowStripes=False)
         tab.tableStyleInfo = style
         self.ws.add_table(tab)
-        self.wb.save('./SignalLog/'+self.str_time+'.xlsx')
+        self.wb.save(self.file_path)
         self.wb.close()
     def roundTime(self,d1,roundTo):
         seconds=(d1-d1.min).seconds
@@ -239,8 +247,10 @@ if __name__ == "__main__":
   #a=ParseData(datetime.datetime(2019,5,28),datetime.datetime(2019,5,30),2,1,False,'MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
   #b=ParseData(datetime.datetime(2019,5,29,9,0),datetime.datetime(2019,6,10,9,1),False,['MOSG / 33KV / H03_CABLEFDR-H16 / MEASUREMENT / VOLTAGE VBR','MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN'],'All Measurements',1,1,'Average')
   #b=ParseData(datetime.datetime(2019,5,28),datetime.datetime(2019,7,6),1,1,True,'MOSG / 33KV / H38_39 BUS SEC / GIS SIGNALS / GIS VT  MCB TRIP','All Signals')
-  b=ParseData(datetime.datetime(2019,7,9,14,5),datetime.datetime(2019,7,9,14,14),False,['MOSG / 33KV / H38_39 BUS SEC / MEASUREMENT / ACTIVE POWER(P)',
-  'MOSG / 33KV / H38_39 BUS SEC / MEASUREMENT / FREQUENCY',
-  'MOSG / 33KV / H38_39 BUS SEC / MEASUREMENT / CURRENT IB'],'All Measurements',5,1,'Average') #19,25,4
+  b=ParseData(datetime.datetime(2019,7,9,14,5),datetime.datetime(2019,7,9,14,14),False,[
+    'MOSG / 33KV / H38_39 BUS SEC / MEASUREMENT / ACTIVE POWER(P)',
+    'MOSG / 33KV / H38_39 BUS SEC / MEASUREMENT / FREQUENCY',
+    'MOSG / 33KV / H38_39 BUS SEC / MEASUREMENT / CURRENT IB',
+    ],'All Measurements',5,1,'Average') #19,25,4
   print(b.result)
  

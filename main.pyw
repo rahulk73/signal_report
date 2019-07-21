@@ -5,7 +5,11 @@ Credits:
 
 Icon made by VisualPharm at icon-icons.com/icon/database-the-application/2803 (License : CC Attribution)
 """
-from tkcalendar import *
+import tkinter as tk
+from tkinter import ttk
+from ttkwidgets import CheckboxTreeview
+import datetime
+from tkcalendar import Calendar
 from xlsscript import ParseData
 from sqlscript import GetSignals
 from signaltree import Tree,Node
@@ -109,6 +113,7 @@ class MainApplication(tk.Canvas):
         self.create_text(285,70,text=":",fill='white',anchor='nw',font=("Arial", 12, "bold"))
         self.tmin.place(x=295,y=70)
         self.advanbutton.place(x=350,y=25)
+        self.templatebutton.place(x=500,y=25)
         self.create_text(15,200,text="Object Path(s): ",fill='white',anchor='nw',font=("Arial", 12, "bold"))
         self.container.place(x=150,y=200)
         self.listbox.grid()
@@ -122,13 +127,17 @@ class MainApplication(tk.Canvas):
             if self.hidden:
                 extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get())),
                 datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get())),
-                self.hidden,self.object_fullpaths,self.navbar.optionvar.get())
+                self.hidden,self.object_fullpaths,self.navbar.optionvar.get(),template_path=self.template_path)
                 found=extraction.result
             else:
+                if self.navbar.optionvar.get() == 'All Measurements':
+                    option = self.optionvar_mv.get()
+                else:
+                    option = self.optionvar_mt.get()
                 extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get())),
                 datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get())),
-                self.hidden,self.object_fullpath,self.navbar.optionvar.get(),
-                self.fqentry.get(),self.radb.get(),self.optionvar.get())
+                self.hidden,self.object_fullpaths,self.navbar.optionvar.get(),
+                self.fqentry.get(),self.radb.get(),option,self.template_path)
                 found=extraction.result       
             self.progress.stop()
             self.progress.place_forget()
@@ -145,8 +154,9 @@ class MainApplication(tk.Canvas):
                 system("start EXCEL.EXE \"./SignalLog/"+extraction.str_time+".xlsx\"")
             elif found==2:
                 tk.messagebox.showwarning("Info","Records for the following data could not be found-\n"+',\n'.join(extraction.not_found))
+                system("start EXCEL.EXE \"./SignalLog/"+extraction.str_time+".xlsx\"")
         if not self.datetimecheck():
-            messagebox.showerror("Date Error","The time interval is invalid. Try Again")
+            tk.messagebox.showerror("Date Error","The time interval is invalid. Try Again")
             return
         self.disable_all()        
         threading.Thread(target=thread_extract).start()
@@ -155,8 +165,8 @@ class MainApplication(tk.Canvas):
     def setup(self):
         self.to_datetime = datetime.datetime.now()
         self.from_datetime = self.to_datetime +datetime.timedelta(hours=-1)
-        self.tdate = calendar.datetime.date(self.to_datetime.year,self.to_datetime.month,self.to_datetime.day)
-        self.fdate=calendar.datetime.date(self.from_datetime.year,self.from_datetime.month,self.from_datetime.day)
+        self.tdate = datetime.date(self.to_datetime.year,self.to_datetime.month,self.to_datetime.day)
+        self.fdate = datetime.date(self.from_datetime.year,self.from_datetime.month,self.from_datetime.day)
         self.fbutton=ttk.Button(self, text='From', command=self.fgetdate,underline=1)
         vcmd = (self.register(self.onValidate),'%P','%W')
         self.fhour = tk.Spinbox(self,from_=0,to=23,wrap=True,width=2,validatecommand=vcmd,validate='key',name='from_hour')
@@ -199,7 +209,9 @@ class MainApplication(tk.Canvas):
         self.listbox = tk.Listbox(self.container,width=85,height=20)
         self.ysb = ttk.Scrollbar(self.container, orient='vertical',command=self.listbox.yview)
         self.listbox.config(yscroll=self.ysb.set)
-        self.cbutton=tk.Button(self,text="Create excel File!",command=self.extract,width=20,height=2)
+        self.template_path = None
+        self.templatebutton = tk.Button(self,text='Select exisiting template (optional)',command=self.file_explore)
+        self.cbutton=tk.Button(self,text="Create Excel Report!",command=self.extract,width=20,height=2)
         self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL,length=100,  mode='indeterminate')
     def fgetdate(self):
         def print_sel():
@@ -262,6 +274,11 @@ class MainApplication(tk.Canvas):
             <(datetime.datetime.combine(self.tdate,datetime.time(hour=int(self.thour.get()),minute=int(self.tmin.get()))))
             <=datetime.datetime.now())
         return False
+    def file_explore(self):
+        self.template_pathwrapper = tk.filedialog.askopenfile(initialdir='.', title='Select Report Template',filetypes=(('Excel files','*.xlsx'),))
+        if self.template_pathwrapper:
+            self.template_path = self.template_pathwrapper.name
+
     def onValidate(self,P,W):
         called_by=W.split('.')[-1]
         if called_by in ['from_hour','to_hour']:
@@ -290,6 +307,7 @@ class MainApplication(tk.Canvas):
             self.fqvar.set(1)
     def disable_all(self):
         self.cbutton['state']='disabled'
+        self.templatebutton['state']='disabled'
         self.advanbutton['state']='disabled'
         self.fbutton['state']='disabled'
         self.tbutton['state']='disabled'
@@ -301,6 +319,7 @@ class MainApplication(tk.Canvas):
             self.optionmenu_mv['state']='disabled'
     def enable_all(self):
         self.cbutton['state']='normal'
+        self.templatebutton['state']='normal'
         self.advanbutton['state']='normal'
         self.fbutton['state']='normal'
         if not self.hidden:

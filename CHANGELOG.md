@@ -2,6 +2,13 @@
 All notable changes (Added features,depracated features,removed features,changed functionalities and bug fixes) will be documented in this file.
 
 ##[Unreleased]
+## [0.6.6] 2019-07-21
+##Added
+-Feature to select a predefined excel template.
+
+##Fixed
+-Minor bugs in extract function
+
 ## [0.5.5] 2019-07-21
 ##Fixed
 -Minor bug fixes in sqlscript in cases when table not found and single digit values tables.
