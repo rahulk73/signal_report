@@ -7,7 +7,7 @@ Icon made by VisualPharm at icon-icons.com/icon/database-the-application/2803 (L
 """
 import tkinter as tk
 from tkinter import ttk
-from ttkwidgets import CheckboxTreeview
+from checkboxtreeview import CheckboxTreeview
 import datetime
 from tkcalendar import Calendar
 from xlsscript import ParseData
@@ -186,7 +186,7 @@ class MainApplication(tk.Canvas):
         self.flabel=tk.Label(self,textvariable=self.fstr,width=10)
         self.tstr=tk.StringVar(self,self.date_format(self.tdate))
         self.tlabel=tk.Label(self,textvariable=self.tstr,width=10)
-        self.photoimage=tk.PhotoImage(file="C:\\Users\\OISM\\Desktop\\SignalReportApp\\bgimage.png")
+        self.photoimage=tk.PhotoImage(file="./img/bgimage.png")
         self.parent.geometry("%dx%d" % (w,h))
         self.parent.title("Create Exel Log File")
         self.btn_text=tk.StringVar(self,value="Show Advanced Options")
@@ -212,7 +212,7 @@ class MainApplication(tk.Canvas):
         self.template_path = None
         self.templatebutton = tk.Button(self,text='Select exisiting template (optional)',command=self.file_explore)
         self.cbutton=tk.Button(self,text="Create Excel Report!",command=self.extract,width=20,height=2)
-        self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL,length=100,  mode='indeterminate')
+        self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL,length=200,  mode='determinate')
     def fgetdate(self):
         def print_sel():
             self.fdate=self.fcal.selection_get()
@@ -332,7 +332,7 @@ class MainApplication(tk.Canvas):
         return(str(datetime.datetime.strptime(str(date),"%Y-%m-%d").strftime("%d/%m/%Y")))
 if  __name__=='__main__':
     root=tk.Tk()
-    root.iconbitmap(default='icon.ico')
+    root.iconbitmap(default='./img/icon.ico')
     MainApplication(root).pack(side='top',fill='both',expand=True)
     root.mainloop()
 
