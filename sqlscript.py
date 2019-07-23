@@ -66,6 +66,14 @@ if __name__ == "__main__":
     #data=GetSignalData('MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
     # data=GetSignalData('MOSG / 33KV / H32_T30 (LV) INC / BCU SYNCROCHECK / ON/OFF SPS','All Signals')
     #data=GetSignals()
-    data=GetSignalData('MOSG / 33KV / H03_CABLEFDR-H16 / MEASUREMENT / VOLTAGE VBR','All Measurements')
+    data=GetSignalData('MOSG / 33KV / H01_T40 TRF / MEASUREMENT / ACTIVE POWER(P)','All Measurements')
     print(data.result)
-    print(next(data.result))
+    f = open('outpu.txt','w')
+    try:
+        while True:
+            f.write(str(next(data.result))+'\n')
+    except StopIteration:
+        print('stopped')
+    finally:
+        f.close()
+        

@@ -28,11 +28,15 @@ class Increment():
 class ExcessiveDataError(Exception):
     pass
 class ParseData:
-    def __init__(self,fdate,tdate,hidden,object_fullpaths,signal_type,fq=None,radb=None,data_type='Changes',template_path=None):
+    def __init__(self,fdate,tdate,timezone,hidden,object_fullpaths,signal_type,fq=None,radb=None,data_type='Changes',template_path=None):
         try:
             self.str_time=datetime.datetime.now().strftime('%a %d %b %y %I-%M-%S%p')
             self.file_path = './SignalLog/'+self.str_time+'.xlsx'
             self.template_path = template_path
+            timezonediff = (-1)*int(re.findall('GMT(.+):00',timezone)[0])
+            fdate += datetime.timedelta(hours=timezonediff)
+            tdate += datetime.timedelta(hours=timezonediff)
+            timezonediff*=-1
             self.signal_info=[]
             self.all_signal_data=[]
             self.object_fullpaths = list(object_fullpaths)
@@ -53,7 +57,7 @@ class ParseData:
                         next_dt = fdate
                         cur_val=()
                         for vm,vo,dt,ms,vq,vv in self.unparsed_data:
-                            dt=dt+datetime.timedelta(milliseconds=ms)
+                            dt+=datetime.timedelta(milliseconds=ms)
                             if len(self.data)>12800:
                                 raise ExcessiveDataError
                             if vo != self.uid:
@@ -64,25 +68,66 @@ class ParseData:
                                 if self.found_first[vo] == 0:
                                     if cur_val:
                                         self.incrementdata = Increment(cur_val[3])
-                                        self.average_aux = [float(cur_val[3]),1.0,float(cur_val[3]),float(cur_val[3])]
-                                        self.avg = [(self.average_aux[0]/self.average_aux[1],float(cur_val[3]),float(cur_val[3])),]
-                                        self.data.append((str(next_dt.date()),str(next_dt.time()),*cur_val),)
+                                        self.average_aux = [
+                                            float(cur_val[3]),
+                                            1.0,
+                                            float(cur_val[3]),
+                                            float(cur_val[3])
+                                        ]
+                                        self.avg = [
+                                            (
+                                                self.average_aux[0]/self.average_aux[1],
+                                                float(cur_val[3]),
+                                                float(cur_val[3])
+                                            ),
+                                        ]
+                                        self.data.append(
+                                            (
+                                                str((next_dt+datetime.timedelta(hours=timezonediff)).date()),
+                                                str((next_dt+datetime.timedelta(hours=timezonediff)).time()),
+                                                *cur_val,
+                                            ),
+                                        )
                                     else:
                                         cur_val=('Disconnected',)*4
                                         self.incrementdata=Increment('Disconnected')
                                         self.average_aux=[None,None,None,None]
                                         self.avg=[('Disconnected',)*3]
-                                        self.data.append((str(next_dt.date()),str(next_dt.time()),*cur_val),)
+                                        self.data.append(
+                                            (
+                                                str((next_dt+datetime.timedelta(hours=timezonediff)).date()),
+                                                str((next_dt+datetime.timedelta(hours=timezonediff)).time()),
+                                                *cur_val
+                                            ),
+                                        )
                                     self.found_first[vo]=1
                                 else:
                                         self.incrementdata.next(cur_val[3])
-                                        self.avg.append((self.average_aux[0]/self.average_aux[1],self.average_aux[2],self.average_aux[3]))
-                                        self.data.append((str(next_dt.date()),str(next_dt.time()),*cur_val),)
+                                        self.avg.append(
+                                            (
+                                                self.average_aux[0]/self.average_aux[1],
+                                                self.average_aux[2],
+                                                self.average_aux[3],
+                                            ),
+                                        )
+                                        self.data.append(
+                                            (
+                                                str((next_dt+datetime.timedelta(hours=timezonediff)).date()),
+                                                str((next_dt+datetime.timedelta(hours=timezonediff)).time()),
+                                                *cur_val                                               
+                                            ),
+                                        )
                                 next_dt=self.roundTime(next_dt,self.roundTo)                            
-                                while dt>next_dt and next_dt<tdate:
+                                while next_dt<dt and next_dt<tdate:
                                     self.incrementdata.next('Disconnected')
                                     self.avg.append(('Disconnected',)*3)
-                                    self.data.append((str(next_dt.date()),str(next_dt.time()),*cur_val),)
+                                    self.data.append(
+                                        (
+                                            str((next_dt+datetime.timedelta(hours=timezonediff)).date()),
+                                            str((next_dt+datetime.timedelta(hours=timezonediff)).time()),
+                                            *cur_val                                               
+                                        ),
+                                    )
                                     next_dt=self.roundTime(next_dt,self.roundTo)
                                 cur_val=(vm,vo,vq,vv)
                                 self.average_aux[0]=self.average_aux[2]=self.average_aux[3]=vv
@@ -98,6 +143,18 @@ class ParseData:
                                         self.average_aux[3]=vv
                                     self.average_aux[0]+=vv
                                     self.average_aux[1]+=1
+                        while next_dt<=tdate:
+                            self.incrementdata.next('Disconnected')
+                            self.avg.append(('Disconnected',)*3)
+                            self.data.append(
+                                (
+                                    str((next_dt+datetime.timedelta(hours=timezonediff)).date()),
+                                    str((next_dt+datetime.timedelta(hours=timezonediff)).time()),
+                                    *cur_val                                               
+                                ),
+                            )
+                            next_dt=self.roundTime(next_dt,self.roundTo)
+
                         if self.data:
                             if data_type == 'Average':
                                 self.data = [i+j for i,j in zip(self.data,self.avg)]
@@ -105,20 +162,34 @@ class ParseData:
                                 self.data = [i+(k,) for i,k in zip(self.data,self.incrementdata.inc)]
                     else:
                         for vm,vo,dt,ms,vq,vv in self.unparsed_data:
+                            dt+=datetime.timedelta(milliseconds=ms)
                             if(dt>=fdate and dt<=tdate and  vo==self.uid):
-                                self.data.append((str(dt.date()),str(self.addSecs(dt.time(),ms)),vm,vo,vq,vv))
+                                self.data.append(
+                                    (
+                                        str((dt+datetime.timedelta(hours=timezonediff)).date()),
+                                        str((dt+datetime.timedelta(hours=timezonediff)).time()),
+                                        vm,vo,vq,vv
+                                    ),
+                                )
                 else:
                     for dt,ms,eo,em,eu in self.unparsed_data:
+                        dt+=datetime.timedelta(milliseconds=ms)
                         if(dt>=fdate and dt<=tdate and  eo==self.uid):
                             match=re.findall('.+=(.+)',eu)
                             if match:
                                 match=match[0]
                             else:
                                 match=''
-                            self.data.append((str(dt.date()),str(self.addSecs(dt.time(),ms)),em,match))
+                            self.data.append(
+                                (
+                                    str((dt+datetime.timedelta(hours=timezonediff)).date()),
+                                    str((dt+datetime.timedelta(hours=timezonediff)).time()),
+                                    em,match
+                                )
+                            )
                 self.all_signal_data.append(self.data)
             if not self.isListEmpty(self.all_signal_data):
-                self.create_table(signal_type,data_type)
+                self.create_table(signal_type,data_type,hidden)
                 self.populate_table()
                 if self.not_found:
                     self.result = 2
@@ -132,11 +203,12 @@ class ParseData:
             self.result = -3
         except Exception as e:
             self.result = -2
+            self.errormessage = e
             print(e)
     def populate_table(self):
         pass
 
-    def create_table(self,signal_type,data_type):
+    def create_table(self,signal_type,data_type,hidden):
         def header_build(step,column=3):
             for i,path in enumerate(self.object_fullpaths,start=1):
                 for j in range(step):
@@ -181,47 +253,82 @@ class ParseData:
                     self.ws.cell(row=self.cur_row+3,column=column+j,value=field[j]+str(i))
                 column+=step
             return step
-        def type4(step=2):
-            self.ws.append(['Date','Time','Event Mess','Event Userlooked'],start=1)
-            header_build(step)
-            column = 3
-            for i,field in enumerate([['Value Meantype-','Value Object UID-','Value Quality-','Value Value-']]*len(self.object_fullpaths)):
-                for j in range(step):
-                    self.ws.cell(row=self.cur_row+3,column=column+j,value=field[j]+str(i))
-                column+=step
-            return step
+        def type4(index,step):
+            column = 1
+            for j in range(1,step+1):
+                self.ws.column_dimensions[cell.get_column_letter(j)].width=25
+            base_cell = self.ws.cell(row=self.cur_row, column=column)
+            self.ws.merge_cells(start_row=self.cur_row,end_row=self.cur_row+2,start_column=column,end_column=column+step-1)
+            base_cell.value = self.object_fullpaths[index]
+            base_cell.alignment = align_head
+            if index%2:            
+                base_cell.font = alt_font_head
+                base_cell.fill = alt_fill_head
+            else:
+                base_cell.font = font_head
+                base_cell.fill = fill_head
+            if step==6:
+                for i,head in enumerate(['Date','Time','Value Meantype','Value Object UID','Value Quality','Value']):
+                    self.ws.cell(row=self.cur_row+3,column=column+i,value=head)
+            else:
+                for i,head in enumerate(['Date','Time','Event Mess','Event Userlooked']):
+                    self.ws.cell(row=self.cur_row+3,column=column+i,value=head)
+            for row in self.all_signal_data[index]:
+                self.ws.append(row)
+            tab = Table(displayName='Report'+str(index),ref="A"+str(self.cur_row+3)+":"+cell.get_column_letter(step)+str(len(self.all_signal_data[index])+self.cur_row+3))
+            style = TableStyleInfo(name='TableStyleMedium9',showColumnStripes=True,showRowStripes=False)
+            tab.tableStyleInfo = style
+            self.ws.add_table(tab)
+            self.ws = self.wb.create_sheet()
+            self.cur_row = self.ws.max_row 
+
         if self.template_path:
             copyfile(self.template_path,self.file_path)
             self.wb = load_workbook(filename=self.file_path)
         else:
             self.wb = Workbook()
         self.ws = self.wb.active
-        self.cur_row = self.ws.max_row+2
+        self.cur_row = self.ws.max_row
         font_head =  Font(b=True,color="4EB1BA",sz=15)
         alt_font_head = Font(b=True,color='FFFFFF',sz=15)
         align_head = Alignment(horizontal='center',vertical='center')
         fill_head = PatternFill('solid',fgColor='222930')
         alt_fill_head = PatternFill('solid',fgColor='FF8362')
-        self.zipped_data = []
         self.not_found=[]
-        table_type = {'All Measurements':{'Changes':type1,'Consumption':type2,'Average':type3}}
+        if not hidden:
+            self.zipped_data = []
+            table_type = dict.fromkeys(
+                ['All Measurements','All Metering'], {
+                    'Changes':type1,
+                    'Consumption':type2,
+                    'Average':type3,
+                }
+            )
+            for index,signal_data in enumerate(self.all_signal_data):
+                if signal_data and self.zipped_data == []:
+                    self.zipped_data = signal_data
+                elif signal_data and self.zipped_data:
+                    self.zipped_data = [i+j[2:] for i,j in zip(self.zipped_data,signal_data)]
+                elif not signal_data:
+                    self.not_found.append(self.object_fullpaths.pop(index))
+            step = table_type.get(signal_type,dict()).get(data_type,None)()
 
-        for index,signal_data in enumerate(self.all_signal_data):
-            if signal_data and self.zipped_data == []:
-                self.zipped_data = signal_data
-            elif signal_data and self.zipped_data:
-                self.zipped_data = [i+j[2:] for i,j in zip(self.zipped_data,signal_data)]
-            elif not signal_data:
-                self.not_found.append(self.object_fullpaths.pop(index))
-        step = table_type.get(signal_type,dict()).get(data_type,type4)()
+            for row in self.zipped_data:
+                self.ws.append(row)
 
-        for row in self.zipped_data:
-            self.ws.append(row)
-
-        tab = Table(displayName='Report',ref="A"+str(self.cur_row+3)+":"+cell.get_column_letter(2+len(self.object_fullpaths)*step)+str(len(self.zipped_data)+4))
-        style = TableStyleInfo(name='TableStyleMedium9',showColumnStripes=True,showRowStripes=False)
-        tab.tableStyleInfo = style
-        self.ws.add_table(tab)
+            tab = Table(displayName='Report',ref="A"+str(self.cur_row+3)+":"+cell.get_column_letter(2+len(self.object_fullpaths)*step)+str(len(self.zipped_data)+self.cur_row+3))
+            style = TableStyleInfo(name='TableStyleMedium9',showColumnStripes=True,showRowStripes=False)
+            tab.tableStyleInfo = style
+            self.ws.add_table(tab)       
+        else:
+            for index,signal_data in enumerate(self.all_signal_data):
+                if signal_data:
+                    if signal_type in ['All Measurements','All Metering']:
+                        type4(index,step=6)
+                    else:
+                        type4(index,step=4)
+                else:
+                    self.not_found.append(self.object_fullpaths[index])
         self.wb.save(self.file_path)
         self.wb.close()
     def roundTime(self,d1,roundTo):
@@ -232,10 +339,6 @@ class ParseData:
             return d2
         else:
             return d2+datetime.timedelta(seconds=roundTo)
-    def addSecs(self,tm,ms):
-        d1=datetime.datetime(1,1,1,tm.hour,tm.minute,tm.second)
-        d1+=datetime.timedelta(milliseconds=ms)
-        return d1.time()
     def isListEmpty(self,inList):
         if isinstance(inList,list):
             return all(map(self.isListEmpty,inList))
@@ -244,13 +347,15 @@ class ParseData:
 
 
 if __name__ == "__main__":
-  #a=ParseData(datetime.datetime(2019,5,28),datetime.datetime(2019,5,30),2,1,False,'MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
-  #b=ParseData(datetime.datetime(2019,5,29,9,0),datetime.datetime(2019,6,10,9,1),False,['MOSG / 33KV / H03_CABLEFDR-H16 / MEASUREMENT / VOLTAGE VBR','MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN'],'All Measurements',1,1,'Average')
-  #b=ParseData(datetime.datetime(2019,5,28),datetime.datetime(2019,7,6),1,1,True,'MOSG / 33KV / H38_39 BUS SEC / GIS SIGNALS / GIS VT  MCB TRIP','All Signals')
-  b=ParseData(datetime.datetime(2019,7,9,14,5),datetime.datetime(2019,7,9,14,14),False,[
-    'MOSG / 33KV / H38_39 BUS SEC / MEASUREMENT / ACTIVE POWER(P)',
-    'MOSG / 33KV / H38_39 BUS SEC / MEASUREMENT / FREQUENCY',
-    'MOSG / 33KV / H38_39 BUS SEC / MEASUREMENT / CURRENT IB',
-    ],'All Measurements',5,1,'Average') #19,25,4
-  print(b.result)
+
+    b=ParseData(datetime.datetime(2019,7,22,12,39),datetime.datetime(2019,7,22,12,55),'GMT+4:00',True,[
+      'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / ACTIVE POWER(P)',
+      'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / CURRENT IB',
+      'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / VOLTAGE VRY',
+      'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / FREQUENCY'
+  ],'All Measurements',5,1,'Average') #65,2,25 
+    c=ParseData(datetime.datetime(2019,7,4,10,41),datetime.datetime(2019,7,4,11,0),'GMT+4:00',True,[
+        'MOSG / 33KV / H12_13 BUS SEC / Q0 CB / POSITION'
+    ],'All Signals')
+    print(b.result)
  

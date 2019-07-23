@@ -2,6 +2,14 @@
 All notable changes (Added features,depracated features,removed features,changed functionalities and bug fixes) will be documented in this file.
 
 ##[Unreleased]
+## [0.8.7] 2019-7-23
+##Added
+-Timezone selection feature. Will automatically convert and check database and convert back while printing report.
+-Feature for multiple signals raw data presented in seperate worksheets
+
+##Fixed
+-Boundary condition when o further data is available but next_dt is less than tdate
+
 ## [0.6.6] 2019-07-21
 ##Added
 -Feature to select a predefined excel template.

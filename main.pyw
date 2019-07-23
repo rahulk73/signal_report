@@ -112,8 +112,9 @@ class MainApplication(tk.Canvas):
         self.thour.place(x=255,y=70)
         self.create_text(285,70,text=":",fill='white',anchor='nw',font=("Arial", 12, "bold"))
         self.tmin.place(x=295,y=70)
-        self.advanbutton.place(x=350,y=25)
-        self.templatebutton.place(x=500,y=25)
+        self.timezonemenu.place(x=350,y=23)
+        self.advanbutton.place(x=470,y=25)
+        self.templatebutton.place(x=620,y=25)
         self.create_text(15,200,text="Object Path(s): ",fill='white',anchor='nw',font=("Arial", 12, "bold"))
         self.container.place(x=150,y=200)
         self.listbox.grid()
@@ -127,7 +128,7 @@ class MainApplication(tk.Canvas):
             if self.hidden:
                 extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get())),
                 datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get())),
-                self.hidden,self.object_fullpaths,self.navbar.optionvar.get(),template_path=self.template_path)
+                self.timezonevar.get(),self.hidden,self.object_fullpaths,self.navbar.optionvar.get(),template_path=self.template_path)
                 found=extraction.result
             else:
                 if self.navbar.optionvar.get() == 'All Measurements':
@@ -136,7 +137,7 @@ class MainApplication(tk.Canvas):
                     option = self.optionvar_mt.get()
                 extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get())),
                 datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get())),
-                self.hidden,self.object_fullpaths,self.navbar.optionvar.get(),
+                self.timezonevar.get(),self.hidden,self.object_fullpaths,self.navbar.optionvar.get(),
                 self.fqentry.get(),self.radb.get(),option,self.template_path)
                 found=extraction.result       
             self.progress.stop()
@@ -144,7 +145,7 @@ class MainApplication(tk.Canvas):
             if found==-3:
                 tk.messagebox.showerror("Error","Too much data to process. Narrow down your search criteria and try again")
             elif found==-2:
-                tk.messagebox.showerror("Error","Something went wrong. Restart the application and try again.")
+                tk.messagebox.showerror("Error","Something went wrong. Restart the application and try again.\n"+extraction.errormessage)
             elif found==-1:
                 tk.messagebox.showerror("Error","Close the excel file and try again.")
             elif found==0:
@@ -209,6 +210,34 @@ class MainApplication(tk.Canvas):
         self.listbox = tk.Listbox(self.container,width=85,height=20)
         self.ysb = ttk.Scrollbar(self.container, orient='vertical',command=self.listbox.yview)
         self.listbox.config(yscroll=self.ysb.set)
+        self.timezoneOPTIONS = (
+            'GMT',
+            'GMT+1:00'
+            'GMT+2:00',
+            'GMT+3:00',
+            'GMT+4:00',
+            'GMT+5:00',
+            'GMT+6:00',
+            'GMT+7:00',
+            'GMT+8:00',
+            'GMT+9:00',
+            'GMT+10:00',
+            'GMT+11:00',
+            'GMT+12:00',
+            'GMT-11:00',
+            'GMT-10:00',
+            'GMT-9:00',
+            'GMT-8:00',
+            'GMT-7:00',
+            'GMT-6:00',
+            'GMT-5:00',
+            'GMT-4:00',
+            'GMT-3:00',
+            'GMT-2:00',
+            'GMT-1:00',
+        )
+        self.timezonevar = tk.StringVar(self,value='GMT+4:00')
+        self.timezonemenu = tk.OptionMenu(self,self.timezonevar,*self.timezoneOPTIONS)
         self.template_path = None
         self.templatebutton = tk.Button(self,text='Select exisiting template (optional)',command=self.file_explore)
         self.cbutton=tk.Button(self,text="Create Excel Report!",command=self.extract,width=20,height=2)
