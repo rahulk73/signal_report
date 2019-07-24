@@ -42,9 +42,9 @@ class ParseData:
     def __init__(self,fdate,tdate,timezone,hidden,object_fullpaths,signal_type,fq=None,radb=None,data_type='Changes',template_path=None):
         try:
             self.str_time=datetime.datetime.now().strftime('%a %d %b %y %I-%M-%S%p')
-            if not os_path.isdir('../../../SignalLog'):
-                mkdir('../../../SignalLog')
-            self.file_path = '../../../SignalLog/'+self.str_time+'.xlsx'
+            if not os_path.isdir('./SignalLog'):
+                mkdir('./SignalLog')
+            self.file_path = './SignalLog/'+self.str_time+'.xlsx'
             self.template_path = template_path #= "C:/Users/OISM/Desktop/Signal Report/Templates/template1.xlsx"
             timezonediff = (-1)*int(re.findall('GMT(.+):00',timezone)[0])
             fdate += datetime.timedelta(hours=timezonediff)

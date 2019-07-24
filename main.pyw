@@ -297,7 +297,7 @@ class MainApplication(tk.Canvas):
             self.customization = Preferences.options_default
         self.timezonevar = tk.StringVar(self,value='GMT+4:00')
         self.timezonemenu = tk.OptionMenu(self,self.timezonevar,*self.timezoneOPTIONS)
-        self.template_dir_path = '../../../Templates'
+        self.template_dir_path = '.Templates'
         self.template_text_box = tk.Text(self,width=75,height=1,font=('Helvetica',12,))
         self.template_text_box.tag_config('format1',justify='center')
         self.template_text_box.tag_config('format2',foreground='grey')
