@@ -14,10 +14,55 @@ from xlsscript import ParseData
 from sqlscript import GetSignals
 from signaltree import Tree,Node
 import threading
-from os import system
+import pickle
+from os import system,path,mkdir,remove
 w=1400
 h=700
+class Preferences(tk.Frame):
+    options_default = {
+    'Excel':{
+        1:0
+    },
+    'Template':{
+        1:''
+    }
+}
+    def __init__(self,parent,MainApp):
+        tk.Frame.__init__(self,parent)
+        self.mainapp=MainApp
 
+        self.grid_columnconfigure(0,weight=1)
+        if path.isfile('settings'):
+            with open('settings','rb') as file:
+                self.options = pickle.load(file)
+        else:
+            self.options = Preferences.options_default
+
+        self.excel1var = tk.IntVar(self,self.options['Excel'][1])
+        self.excel1var.trace('w',self.column_hide)
+
+        ttk.Separator(self,orient=tk.HORIZONTAL).grid(row=1,column=0,sticky='ew')
+        tk.Label(self,text='1) Template Settings').grid(row=1,column=0,sticky='w')
+        tk.Label(self,text='Default template').grid(row=2,column=0,sticky='w')
+        self.default_template_label = tk.Label(self,text=self.options['Template'][1])
+        self.default_template_label.grid(row=2,column=1)
+        self.default_template_button = tk.Button(self,text='Set currenly selected template as default',command=self.set_default)
+        if not path.isfile(self.mainapp.template_text_box.get('1.0',tk.END).rstrip()):
+            self.default_template_button['state']='disabled'
+            self.options['Template'][1]=self.default_template_label['text']=''
+        self.default_template_button.grid(row=2,column=2)
+
+        ttk.Separator(self,orient=tk.HORIZONTAL).grid(row=3,column=0,sticky='ew')
+
+        tk.Label(self,text='2) Excel Settings').grid(row=3,column=0,sticky='w')
+        tk.Label(self,text='Columns hidden in template stay hidden in report.\n(Note that this will prevent Signal Report from creating groups if multiple signals are created)').grid(row=4,column=0)
+        self.column_hide_checkbutton = tk.Checkbutton(self,variable=self.excel1var)
+        self.column_hide_checkbutton.grid(row=4,column=1)
+    def set_default(self):
+        self.options['Template'][1] = self.default_template_label['text']=self.mainapp.template_text_box.get('1.0',tk.END)
+    def column_hide(self,*args):
+        self.options['Excel'][1]=self.excel1var.get()
+            
 class Navbar(tk.Frame):
     def __init__(self,parent):
         tk.Frame.__init__(self,parent)
@@ -68,7 +113,7 @@ class Navbar(tk.Frame):
         if self.optionvar.get() in self.OPTIONS[:-2]:
             self.parent.advanbutton['state']='disabled'
             if not self.parent.hidden:
-                self.parent.btn_text.set("Show Advanced Options")
+                self.parent.advanbtn_text.set("Show Advanced Options")
                 self.parent.delete('showtext')
                 self.parent.fqentry.place_forget()
                 self.parent.radiobutton1.place_forget()
@@ -98,6 +143,9 @@ class MainApplication(tk.Canvas):
         tk.Canvas.__init__(self,parent)
         self.parent=parent
         self.setup()
+        self.menubar = tk.Menu(self.parent)
+        self.menubar.add_command(label='Preferences',command=self.preferencesWindow)
+        self.parent.config(menu=self.menubar)
         self.navbar=Navbar(self)
         self.navbar.place(x=700,y=80)
         self.create_image(0,0,image=self.photoimage,anchor='nw')
@@ -114,17 +162,23 @@ class MainApplication(tk.Canvas):
         self.tmin.place(x=295,y=70)
         self.timezonemenu.place(x=350,y=23)
         self.advanbutton.place(x=470,y=25)
-        self.templatebutton.place(x=620,y=25)
         self.create_text(15,200,text="Object Path(s): ",fill='white',anchor='nw',font=("Arial", 12, "bold"))
         self.container.place(x=150,y=200)
         self.listbox.grid()
         self.ysb.grid(row=0, column=1, sticky='ns')
+        self.template_text_box.place(x=350,y=560)
+        self.template_browse_button.place(x=1050,y=560)
+        self.template_clear_button.place(x=1200,y=560)
         self.cbutton.place(x=150,y=560)
     def extract(self):
         def thread_extract():
-            self.progress.place(x=400,y=560)
+            self.progress.place(x=500,y=650)
             self.progress.start()
             self.object_fullpaths=self.listbox.get(0,tk.END)
+            if path.isfile(self.template_text_box.get('1.0',tk.END).rstrip()):
+                self.template_path = self.template_text_box.get('1.0',tk.END).rstrip()
+            else:
+                self.template_path = None
             if self.hidden:
                 extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get())),
                 datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get())),
@@ -145,17 +199,17 @@ class MainApplication(tk.Canvas):
             if found==-3:
                 tk.messagebox.showerror("Error","Too much data to process. Narrow down your search criteria and try again")
             elif found==-2:
-                tk.messagebox.showerror("Error","Something went wrong. Restart the application and try again.\n"+extraction.errormessage)
+                tk.messagebox.showerror("Error","Sorry,something went wrong.\n"+extraction.errormessage)
             elif found==-1:
                 tk.messagebox.showerror("Error","Close the excel file and try again.")
             elif found==0:
                 tk.messagebox.showwarning("Info","No data was found for the selected signal(s).")
             elif found==1:
                 tk.messagebox.showinfo("Extraction Successful !","You can view the records in the file tables.xlsx")
-                system("start EXCEL.EXE \"./SignalLog/"+extraction.str_time+".xlsx\"")
+                system("start EXCEL.EXE \"{}\"".format(extraction.file_path))
             elif found==2:
                 tk.messagebox.showwarning("Info","Records for the following data could not be found-\n"+',\n'.join(extraction.not_found))
-                system("start EXCEL.EXE \"./SignalLog/"+extraction.str_time+".xlsx\"")
+                system("start EXCEL.EXE \"{}\"".format(extraction.file_path))
         if not self.datetimecheck():
             tk.messagebox.showerror("Date Error","The time interval is invalid. Try Again")
             return
@@ -190,8 +244,8 @@ class MainApplication(tk.Canvas):
         self.photoimage=tk.PhotoImage(file="./img/bgimage.png")
         self.parent.geometry("%dx%d" % (w,h))
         self.parent.title("Create Exel Log File")
-        self.btn_text=tk.StringVar(self,value="Show Advanced Options")
-        self.advanbutton=tk.Button(self,textvariable=self.btn_text,command=self.advance)
+        self.advanbtn_text=tk.StringVar(self,value="Show Advanced Options")
+        self.advanbutton=tk.Button(self,textvariable=self.advanbtn_text,command=self.advance)
         self.advanbutton['state']='disabled'
         self.hidden=True
         self.fqvar=tk.StringVar(self,value='1')
@@ -212,7 +266,7 @@ class MainApplication(tk.Canvas):
         self.listbox.config(yscroll=self.ysb.set)
         self.timezoneOPTIONS = (
             'GMT',
-            'GMT+1:00'
+            'GMT+1:00',
             'GMT+2:00',
             'GMT+3:00',
             'GMT+4:00',
@@ -236,12 +290,50 @@ class MainApplication(tk.Canvas):
             'GMT-2:00',
             'GMT-1:00',
         )
+        if path.isfile('settings'):
+            with open('settings','rb') as file:
+                self.customization = pickle.load(file)
+        else:
+            self.customization = Preferences.options_default
         self.timezonevar = tk.StringVar(self,value='GMT+4:00')
         self.timezonemenu = tk.OptionMenu(self,self.timezonevar,*self.timezoneOPTIONS)
-        self.template_path = None
-        self.templatebutton = tk.Button(self,text='Select exisiting template (optional)',command=self.file_explore)
+        self.template_dir_path = '../../../Templates'
+        self.template_text_box = tk.Text(self,width=75,height=1,font=('Helvetica',12,))
+        self.template_text_box.tag_config('format1',justify='center')
+        self.template_text_box.tag_config('format2',foreground='grey')
+        if self.customization['Template'][1]:
+            self.template_text_box.insert('end',self.customization['Template'][1])
+            self.template_text_box.tag_add('format1','1.0',tk.END)
+        else:
+            self.template_text_box.insert('end','Select excel template for report (optional).')
+            self.template_text_box.tag_add('format2','1.0',tk.END)
+        self.template_text_box['state']='disabled'
+        self.template_browse_button = tk.Button(self,text='Browse',command=self.file_explore,width=20,height=1)
+        self.template_clear_button = tk.Button(self,text='Clear',command=self.clear_template_path,width=20,height=1)
         self.cbutton=tk.Button(self,text="Create Excel Report!",command=self.extract,width=20,height=2)
         self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL,length=200,  mode='determinate')
+    def preferencesWindow(self):
+        def save_quit():
+            self.customization = pref.options
+            with open('settings','wb') as file:
+                pickle.dump(self.customization,file)
+            top.destroy()
+        def revert():
+            self.customization = Preferences.options_default
+            if path.isfile('settings'):
+                remove('settings')
+        top = tk.Toplevel()
+        top.grab_set()
+        top.title('Preferences')
+        pref = Preferences(top,self)
+        pref.grid(row=0,column=0)
+        button1 = tk.Button(top,text='Save and close',command=save_quit)
+        button2 = tk.Button(top,text='Discard changes and close',command=top.destroy)
+        button3 = tk.Button(top,text='Revert changes to default\n(This will take effect on next launch)',command=revert)
+        button1.grid(row=2,column=1)
+        button2.grid(row=2,column=2)
+        button3.grid(row=2,column=3)
+
     def fgetdate(self):
         def print_sel():
             self.fdate=self.fcal.selection_get()
@@ -277,7 +369,7 @@ class MainApplication(tk.Canvas):
             self.reg1=self.register(self.freq_valid)
             self.fqentry.config(validate='key',validatecommand=(self.reg1,'%P'))
             self.fqentry.bind('<FocusOut>',self.freq_focusout)
-            self.btn_text.set("Hide Advanced Options")
+            self.advanbtn_text.set("Hide Advanced Options")
             self.create_text(15,150,text="Show\t\t\tevery".expandtabs(11),fill='white',anchor='nw',font=("Arial",12,'bold'),tag='showtext')
             if self.navbar.optionvar.get() == 'All Measurements':
                 self.optionmenu_mv.place(x=65,y=145)
@@ -288,7 +380,7 @@ class MainApplication(tk.Canvas):
             self.radiobutton2.place(x=340,y=150)
             self.radiobutton3.place(x=420,y=150)
         else:
-            self.btn_text.set("Show Advanced Options")
+            self.advanbtn_text.set("Show Advanced Options")
             self.delete('showtext')
             self.fqentry.place_forget()
             self.radiobutton1.place_forget()
@@ -304,9 +396,21 @@ class MainApplication(tk.Canvas):
             <=datetime.datetime.now())
         return False
     def file_explore(self):
-        self.template_pathwrapper = tk.filedialog.askopenfile(initialdir='.', title='Select Report Template',filetypes=(('Excel files','*.xlsx'),))
-        if self.template_pathwrapper:
-            self.template_path = self.template_pathwrapper.name
+        if not path.isdir(self.template_dir_path):
+            mkdir(self.template_dir_path)
+        template_pathwrapper = tk.filedialog.askopenfile(initialdir=self.template_dir_path, title='Select Report Template',filetypes=(('Excel files','*.xlsx'),))
+        if template_pathwrapper:
+            self.template_text_box['state']='normal'
+            self.template_text_box.delete('1.0',tk.END)
+            self.template_text_box.insert('end',template_pathwrapper.name)
+            self.template_text_box.tag_add('format1','1.0',tk.END)
+            self.template_text_box['state']='disabled'
+    def clear_template_path(self):
+        self.template_text_box['state']='normal'
+        self.template_text_box.delete('1.0',tk.END)
+        self.template_text_box.insert('end','Select excel template for report (optional).')
+        self.template_text_box.tag_add('format2','1.0',tk.END)
+        self.template_text_box['state']='disabled'
 
     def onValidate(self,P,W):
         called_by=W.split('.')[-1]
@@ -336,7 +440,8 @@ class MainApplication(tk.Canvas):
             self.fqvar.set(1)
     def disable_all(self):
         self.cbutton['state']='disabled'
-        self.templatebutton['state']='disabled'
+        self.template_browse_button['state']='disabled'
+        self.template_clear_button['state']='disabled'
         self.advanbutton['state']='disabled'
         self.fbutton['state']='disabled'
         self.tbutton['state']='disabled'
@@ -348,7 +453,8 @@ class MainApplication(tk.Canvas):
             self.optionmenu_mv['state']='disabled'
     def enable_all(self):
         self.cbutton['state']='normal'
-        self.templatebutton['state']='normal'
+        self.template_browse_button['state']='normal'
+        self.template_clear_button['state']='normal'
         self.advanbutton['state']='normal'
         self.fbutton['state']='normal'
         if not self.hidden:

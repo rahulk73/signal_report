@@ -2,7 +2,14 @@
 All notable changes (Added features,depracated features,removed features,changed functionalities and bug fixes) will be documented in this file.
 
 ##[Unreleased]
-## [0.8.7] 2019-7-23
+## [0.10.7] 2019-07-24
+##Added
+-View template path chosen,clear path option.
+-Preferences menu option using pickle module to remember preferences.
+
+##Changed
+-Updated setup.py for msi installer build.
+## [0.8.7] 2019-07-23
 ##Added
 -Timezone selection feature. Will automatically convert and check database and convert back while printing report.
 -Feature for multiple signals raw data presented in seperate worksheets

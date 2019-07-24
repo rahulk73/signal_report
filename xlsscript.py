@@ -5,7 +5,18 @@ import openpyxl.utils.cell as cell
 from shutil import copyfile
 import datetime
 import re
+from os import path as os_path
+from os import mkdir
 from sqlscript import GetSignalData 
+import pickle
+options_default = {
+    'Excel':{
+        1:0
+    },
+    'Template':{
+        1:''
+    }
+}
 class Increment():
     def __init__(self,vv):
         if(isinstance(vv,float)):
@@ -31,12 +42,19 @@ class ParseData:
     def __init__(self,fdate,tdate,timezone,hidden,object_fullpaths,signal_type,fq=None,radb=None,data_type='Changes',template_path=None):
         try:
             self.str_time=datetime.datetime.now().strftime('%a %d %b %y %I-%M-%S%p')
-            self.file_path = './SignalLog/'+self.str_time+'.xlsx'
-            self.template_path = template_path
+            if not os_path.isdir('../../../SignalLog'):
+                mkdir('../../../SignalLog')
+            self.file_path = '../../../SignalLog/'+self.str_time+'.xlsx'
+            self.template_path = template_path #= "C:/Users/OISM/Desktop/Signal Report/Templates/template1.xlsx"
             timezonediff = (-1)*int(re.findall('GMT(.+):00',timezone)[0])
             fdate += datetime.timedelta(hours=timezonediff)
             tdate += datetime.timedelta(hours=timezonediff)
             timezonediff*=-1
+            if os_path.isfile('settings'):
+                with open('settings','rb') as file:
+                    self.customization = pickle.load(file)
+            else:
+                self.customization = options_default
             self.signal_info=[]
             self.all_signal_data=[]
             self.object_fullpaths = list(object_fullpaths)
@@ -190,7 +208,6 @@ class ParseData:
                 self.all_signal_data.append(self.data)
             if not self.isListEmpty(self.all_signal_data):
                 self.create_table(signal_type,data_type,hidden)
-                self.populate_table()
                 if self.not_found:
                     self.result = 2
                 else:
@@ -203,10 +220,9 @@ class ParseData:
             self.result = -3
         except Exception as e:
             self.result = -2
-            self.errormessage = e
+            self.errormessage = str(e)
             print(e)
-    def populate_table(self):
-        pass
+
 
     def create_table(self,signal_type,data_type,hidden):
         def header_build(step,column=3):
@@ -223,7 +239,8 @@ class ParseData:
                 else:
                     base_cell.font = font_head
                     base_cell.fill = fill_head
-                self.ws.column_dimensions.group(cell.get_column_letter(column),cell.get_column_letter(column+step-1),hidden=False,outline_level=i)
+                if not self.customization['Excel'][1]:
+                    self.ws.column_dimensions.group(cell.get_column_letter(column),cell.get_column_letter(column+step-1),hidden=False,outline_level=i)
                 column+=step
             self.ws.cell(row=self.cur_row+3,column=1,value='Date')
             self.ws.cell(row=self.cur_row+3,column=2,value='Time')
@@ -288,7 +305,7 @@ class ParseData:
         else:
             self.wb = Workbook()
         self.ws = self.wb.active
-        self.cur_row = self.ws.max_row
+        self.cur_row = self.ws.max_row+2
         font_head =  Font(b=True,color="4EB1BA",sz=15)
         alt_font_head = Font(b=True,color='FFFFFF',sz=15)
         align_head = Alignment(horizontal='center',vertical='center')
@@ -348,14 +365,14 @@ class ParseData:
 
 if __name__ == "__main__":
 
-    b=ParseData(datetime.datetime(2019,7,22,12,39),datetime.datetime(2019,7,22,12,55),'GMT+4:00',True,[
+    b=ParseData(datetime.datetime(2019,7,22,12,39),datetime.datetime(2019,7,22,12,55),'GMT+4:00',False,[
       'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / ACTIVE POWER(P)',
       'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / CURRENT IB',
       'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / VOLTAGE VRY',
       'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / FREQUENCY'
   ],'All Measurements',5,1,'Average') #65,2,25 
-    c=ParseData(datetime.datetime(2019,7,4,10,41),datetime.datetime(2019,7,4,11,0),'GMT+4:00',True,[
-        'MOSG / 33KV / H12_13 BUS SEC / Q0 CB / POSITION'
-    ],'All Signals')
+    # c=ParseData(datetime.datetime(2019,7,4,10,41),datetime.datetime(2019,7,4,11,0),'GMT+4:00',True,[
+    #     'MOSG / 33KV / H12_13 BUS SEC / Q0 CB / POSITION'
+    # ],'All Signals')
     print(b.result)
  
