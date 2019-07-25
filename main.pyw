@@ -10,7 +10,7 @@ from tkinter import ttk
 from checkboxtreeview import CheckboxTreeview
 import datetime
 from tkcalendar import Calendar
-from xlsscript import ParseData
+from xlsscript import ParseData,Preferences
 from sqlscript import GetSignals
 from signaltree import Tree,Node
 import threading
@@ -18,51 +18,96 @@ import pickle
 from os import system,path,mkdir,remove
 w=1400
 h=700
-class Preferences(tk.Frame):
-    options_default = {
-    'Excel':{
-        1:0
-    },
-    'Template':{
-        1:''
-    }
-}
+
+class ExcelPreferences(tk.Frame):
+    def __init__(self,parent,MainApp,options):
+        tk.Frame.__init__(self,parent)
+        self.grid_columnconfigure(0,weight=1)
+        self.parent = parent
+        self.options = options
+        self.mainapp = MainApp
+        self.column_hide_var = tk.IntVar(self,self.options[1])
+        self.column_hide_var.trace('w',self.column_hide)
+        self.seperate_worksheet_var = tk.IntVar(self,self.options[2])
+        self.seperate_worksheet_var.trace('w',self.seperate_worksheet)
+        self.MODES = [
+            ('2D Area Chart','1'),
+            ('3D Area Chart','2'),
+            ('Verical Bar Chart','3'),
+            ('Horizontal Bar Chart','4'),
+            ('3D Bar Chart Chart','5'),
+            ('Line Chart','6'),
+            ('3D Line Chart','7'),
+            ('Scatter Chart','8'),
+            ('None','0')
+
+        ]
+        self.chart_var = tk.StringVar(self,str(self.options[3]))
+        self.chart_var.trace('w',self.set_chart)
+
+        tk.Label(self,text='Columns hidden in template stay hidden in report.').grid(row=0,column=0,sticky='w')
+        self.column_hide_checkbutton = tk.Checkbutton(self,variable=self.column_hide_var)
+        self.column_hide_checkbutton.grid(row=0,column=1)
+
+        tk.Label(self,text='Always use a seperate worksheet for each signal.').grid(row=1,column=0,sticky='w')
+        self.seperate_worksheet_checkbutton = tk.Checkbutton(self,variable=self.seperate_worksheet_var)
+        self.seperate_worksheet_checkbutton.grid(row=1,column=1)
+
+        tk.Label(self,text='Default chart').grid(row=2,column=0,sticky='w',rowspan=2)
+        i,j=1,1
+        for text,mode in self.MODES:
+            if i<5:
+                tk.Radiobutton(self,text=text,variable=self.chart_var,value=mode).grid(row=2,column=i)
+                i+=1
+            else:
+                tk.Radiobutton(self,text=text,variable=self.chart_var,value=mode).grid(row=3,column=j)
+                j+=1
+
+    def column_hide(self,*args):
+        self.options[1]=self.column_hide_var.get()
+    def seperate_worksheet(self,*args):
+        self.options[2]=self.seperate_worksheet_var.get()
+    def set_chart(self,*args):
+        self.options[3]=int(self.chart_var.get())
+
+class TemplatePreferences(tk.Frame):
+    def __init__(self,parent,MainApp,options):
+        tk.Frame.__init__(self,parent)
+        self.grid_columnconfigure(0,weight=1)
+        self.parent = parent
+        self.options = options
+        self.mainapp = MainApp
+
+        tk.Label(self,text='Default template').grid(row=0,column=0,sticky='w')
+        self.default_template_label = tk.Label(self,text=self.options[1])
+        self.default_template_label.grid(row=0,column=1,sticky='w')
+        self.default_template_button = tk.Button(self,text='Set currenly selected template as default',command=self.set_default_template)
+        if not path.isfile(self.mainapp.template_text_box.get('1.0',tk.END).rstrip()):
+            self.default_template_button['state']='disabled'
+            self.options[1]=self.default_template_label['text']=''
+        self.default_template_button.grid(row=0,column=2,sticky='w')
+
+    def set_default_template(self):
+        self.options[1] = self.default_template_label['text']=self.mainapp.template_text_box.get('1.0',tk.END)
+
+class PreferencesContainer(tk.Frame):
     def __init__(self,parent,MainApp):
         tk.Frame.__init__(self,parent)
         self.mainapp=MainApp
-
         self.grid_columnconfigure(0,weight=1)
         if path.isfile('settings'):
             with open('settings','rb') as file:
                 self.options = pickle.load(file)
         else:
             self.options = Preferences.options_default
-
-        self.excel1var = tk.IntVar(self,self.options['Excel'][1])
-        self.excel1var.trace('w',self.column_hide)
-
+            
         ttk.Separator(self,orient=tk.HORIZONTAL).grid(row=1,column=0,sticky='ew')
-        tk.Label(self,text='1) Template Settings').grid(row=1,column=0,sticky='w')
-        tk.Label(self,text='Default template').grid(row=2,column=0,sticky='w')
-        self.default_template_label = tk.Label(self,text=self.options['Template'][1])
-        self.default_template_label.grid(row=2,column=1)
-        self.default_template_button = tk.Button(self,text='Set currenly selected template as default',command=self.set_default)
-        if not path.isfile(self.mainapp.template_text_box.get('1.0',tk.END).rstrip()):
-            self.default_template_button['state']='disabled'
-            self.options['Template'][1]=self.default_template_label['text']=''
-        self.default_template_button.grid(row=2,column=2)
+        tk.Label(self,text='Excel Settings',font='Helvetica 12 bold').grid(row=1,column=0,sticky='ns')
+        ExcelPreferences(self,self.mainapp,self.options['Excel']).grid(sticky='ew',row=2,column=0)
 
         ttk.Separator(self,orient=tk.HORIZONTAL).grid(row=3,column=0,sticky='ew')
-
-        tk.Label(self,text='2) Excel Settings').grid(row=3,column=0,sticky='w')
-        tk.Label(self,text='Columns hidden in template stay hidden in report.\n(Note that this will prevent Signal Report from creating groups if multiple signals are created)').grid(row=4,column=0)
-        self.column_hide_checkbutton = tk.Checkbutton(self,variable=self.excel1var)
-        self.column_hide_checkbutton.grid(row=4,column=1)
-    def set_default(self):
-        self.options['Template'][1] = self.default_template_label['text']=self.mainapp.template_text_box.get('1.0',tk.END)
-    def column_hide(self,*args):
-        self.options['Excel'][1]=self.excel1var.get()
-            
+        tk.Label(self,text='Template Settings',font=('Helvetica 12 bold')).grid(row=3,column=0,sticky='ns')
+        TemplatePreferences(self,self.mainapp,self.options['Template']).grid(sticky='ew',row=4,column=0)
 class Navbar(tk.Frame):
     def __init__(self,parent):
         tk.Frame.__init__(self,parent)
@@ -297,7 +342,7 @@ class MainApplication(tk.Canvas):
             self.customization = Preferences.options_default
         self.timezonevar = tk.StringVar(self,value='GMT+4:00')
         self.timezonemenu = tk.OptionMenu(self,self.timezonevar,*self.timezoneOPTIONS)
-        self.template_dir_path = '.Templates'
+        self.template_dir_path = 'Templates'
         self.template_text_box = tk.Text(self,width=75,height=1,font=('Helvetica',12,))
         self.template_text_box.tag_config('format1',justify='center')
         self.template_text_box.tag_config('format2',foreground='grey')
@@ -325,7 +370,7 @@ class MainApplication(tk.Canvas):
         top = tk.Toplevel()
         top.grab_set()
         top.title('Preferences')
-        pref = Preferences(top,self)
+        pref = PreferencesContainer(top,self)
         pref.grid(row=0,column=0)
         button1 = tk.Button(top,text='Save and close',command=save_quit)
         button2 = tk.Button(top,text='Discard changes and close',command=top.destroy)

@@ -2,6 +2,20 @@
 All notable changes (Added features,depracated features,removed features,changed functionalities and bug fixes) will be documented in this file.
 
 ##[Unreleased]
+## [0.11.8] 2019-07-25
+##Added
+-Preference option to always view multiple signals on multiple worksheets.
+-Chart support for line chart only.Remaining charts on next version.
+
+##Changed
+-Removed redundant method of copying template file to current directory and then editing.
+-Preference layout strcuture for better layout managment.
+-Removed completely option for consumption data for MV values.
+-Code design involcing creating table. Now seperate functions for single sheet and multiple sheet layout.
+
+##Fixed
+-Template not being used after the first worksheet in a workbook of multiplke signals.
+
 ## [0.10.7] 2019-07-24
 ##Added
 -View template path chosen,clear path option.
@@ -9,6 +23,7 @@ All notable changes (Added features,depracated features,removed features,changed
 
 ##Changed
 -Updated setup.py for msi installer build.
+
 ## [0.8.7] 2019-07-23
 ##Added
 -Timezone selection feature. Will automatically convert and check database and convert back while printing report.
