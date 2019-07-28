@@ -31,14 +31,10 @@ class ExcelPreferences(tk.Frame):
         self.seperate_worksheet_var = tk.IntVar(self,self.options[2])
         self.seperate_worksheet_var.trace('w',self.seperate_worksheet)
         self.MODES = [
-            ('2D Area Chart','1'),
-            ('3D Area Chart','2'),
-            ('Verical Bar Chart','3'),
-            ('Horizontal Bar Chart','4'),
-            ('3D Bar Chart Chart','5'),
-            ('Line Chart','6'),
-            ('3D Line Chart','7'),
-            ('Scatter Chart','8'),
+            ('Area Chart','1'),
+            ('Verical Bar Chart','2'),
+            ('Horizontal Bar Chart','3'),
+            ('Line Chart','4'),
             ('None','0')
 
         ]
@@ -56,12 +52,8 @@ class ExcelPreferences(tk.Frame):
         tk.Label(self,text='Default chart').grid(row=2,column=0,sticky='w',rowspan=2)
         i,j=1,1
         for text,mode in self.MODES:
-            if i<5:
                 tk.Radiobutton(self,text=text,variable=self.chart_var,value=mode).grid(row=2,column=i)
                 i+=1
-            else:
-                tk.Radiobutton(self,text=text,variable=self.chart_var,value=mode).grid(row=3,column=j)
-                j+=1
 
     def column_hide(self,*args):
         self.options[1]=self.column_hide_var.get()
@@ -357,6 +349,8 @@ class MainApplication(tk.Canvas):
         self.template_clear_button = tk.Button(self,text='Clear',command=self.clear_template_path,width=20,height=1)
         self.cbutton=tk.Button(self,text="Create Excel Report!",command=self.extract,width=20,height=2)
         self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL,length=200,  mode='determinate')
+        if not path.isdir('./Templates'):
+            mkdir('./Templates')
     def preferencesWindow(self):
         def save_quit():
             self.customization = pref.options

@@ -2,6 +2,14 @@
 All notable changes (Added features,depracated features,removed features,changed functionalities and bug fixes) will be documented in this file.
 
 ##[Unreleased]
+## [0.11.10] 2019-07-28
+##Added
+-Chart support for 4 types of charts (Area,Vertical-Var,Horizontal-Bar,Line).
+
+##Fixed
+-Small bugs related to building charts (Fixed correct step size when iterating through data columns).
+-Edge case when first found was false after exit of unparsed data loop.
+
 ## [0.11.8] 2019-07-25
 ##Added
 -Preference option to always view multiple signals on multiple worksheets.

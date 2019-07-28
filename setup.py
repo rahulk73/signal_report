@@ -14,7 +14,7 @@ os.environ['TK_LIBRARY'] = os.path.join(PYTHON_INSTALL_DIR, 'tcl', 'tk8.6')
 #     },
 # }
 
-build_exe_options = {'packages':['os','tkinter','tkinter.ttk','xlsscript','sqlscript','threading'],'include_files':[
+build_exe_options = {'packages':['os','tkinter','tkinter.ttk','xlsscript','sqlscript','threading','pickle'],'include_files':[
     os.path.join(PYTHON_INSTALL_DIR, 'DLLs', 'tk86t.dll'),
     os.path.join(PYTHON_INSTALL_DIR, 'DLLs', 'tcl86t.dll'),
     './img/',
@@ -32,7 +32,7 @@ shortcut_table = [
         None,
         None,
         None,
-        'TARGETDIR'
+        'TARGETDIR',
     )
 ]
 base = None
@@ -44,7 +44,7 @@ bdist_msi_options = {'data':msi_data}
 
 setup(
     name = 'SignalReport',
-    version = '0.10.7',
+    version = '0.11.10',
     description = 'MVP',
     options = {'build_exe':build_exe_options,'bdist_msi':bdist_msi_options},
     executables = [Executable('main.pyw', base=base,icon="img/icon.ico")]

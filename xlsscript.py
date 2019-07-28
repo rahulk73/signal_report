@@ -13,7 +13,7 @@ class Preferences:
     'Excel':{
         1:0,
         2:0,
-        3:6,
+        3:4,
     },
     'Template':{
         1:'',
@@ -47,7 +47,7 @@ class ParseData:
             if not os_path.isdir('./SignalLog'):
                 mkdir('./SignalLog')
             self.file_path = './SignalLog/'+self.str_time+'.xlsx'
-            self.template_path = template_path = "C:/Users/OISM/Desktop/Signal Report/Templates/template1.xlsx"
+            self.template_path = template_path #= "C:/Users/OISM/Desktop/Signal Report/Templates/template1.xlsx"
             timezonediff = (-1)*int(re.findall('GMT(.+):00',timezone)[0])
             fdate += datetime.timedelta(hours=timezonediff)
             tdate += datetime.timedelta(hours=timezonediff)
@@ -58,10 +58,10 @@ class ParseData:
             else:
                 self.customization = Preferences.options_default
             self.chart_counter = 0
-            self.changes_mv_fields = ('Value Meantype','Value Object UID','Value Quality','Value')
-            self.consumption_mt_fields = ('Value Meantype','Value Object UID','Value Quality','Value','Value Consumption')
-            self.average_mv_fields = ('Value Meantype','Value Object UID','Value Quality','Value','Value Average','Value Max','Value Min')
-            self.changes_event_fields = ('Date','Time','Event Mess','Event Userlooked')
+            self.changes_mv_fields = ('Value Meantype','Value Object UID','Value Quality','Measurement')
+            self.consumption_mt_fields = ('Value Meantype','Value Object UID','Value Quality','Metering','Consumption')
+            self.average_mv_fields = ('Value Meantype','Value Object UID','Value Quality','Measurement','Average','Max','Min')
+            self.changes_event_fields = ('Event Mess','Event Userlooked')
             self.font_head =  Font(b=True,color="4EB1BA",sz=15)
             self.alt_font_head = Font(b=True,color='FFFFFF',sz=15)
             self.align_head = Alignment(horizontal='center',vertical='center')
@@ -173,17 +173,55 @@ class ParseData:
                                         self.average_aux[3]=vv
                                     self.average_aux[0]+=vv
                                     self.average_aux[1]+=1
+                        else:
+                            if self.found_first[self.uid] == 0:
+                                if cur_val:
+                                    self.incrementdata = Increment(cur_val[3])
+                                    self.average_aux = [
+                                        float(cur_val[3]),
+                                        1.0,
+                                        float(cur_val[3]),
+                                        float(cur_val[3])
+                                    ]
+                                    self.avg = [
+                                        (
+                                            self.average_aux[0]/self.average_aux[1],
+                                            float(cur_val[3]),
+                                            float(cur_val[3])
+                                        ),
+                                    ]
+                                    self.data.append(
+                                        (
+                                            str((next_dt+datetime.timedelta(hours=timezonediff)).date()),
+                                            str((next_dt+datetime.timedelta(hours=timezonediff)).time()),
+                                            *cur_val,
+                                        ),
+                                    )
+                                else:
+                                    cur_val=('Disconnected',)*4
+                                    self.incrementdata=Increment('Disconnected')
+                                    self.average_aux=[None,None,None,None]
+                                    self.avg=[('Disconnected',)*3]
+                                    self.data.append(
+                                        (
+                                            str((next_dt+datetime.timedelta(hours=timezonediff)).date()),
+                                            str((next_dt+datetime.timedelta(hours=timezonediff)).time()),
+                                            *cur_val
+                                        ),
+                                    )
+                                self.found_first[self.uid]=1
+                                next_dt=self.roundTime(next_dt,self.roundTo)
                         while next_dt<=tdate:
-                            self.incrementdata.next('Disconnected')
-                            self.avg.append(('Disconnected',)*3)
-                            self.data.append(
-                                (
-                                    str((next_dt+datetime.timedelta(hours=timezonediff)).date()),
-                                    str((next_dt+datetime.timedelta(hours=timezonediff)).time()),
-                                    *cur_val                                               
-                                ),
-                            )
-                            next_dt=self.roundTime(next_dt,self.roundTo)
+                                self.incrementdata.next('Disconnected')
+                                self.avg.append(('Disconnected',)*3)
+                                self.data.append(
+                                    (
+                                        str((next_dt+datetime.timedelta(hours=timezonediff)).date()),
+                                        str((next_dt+datetime.timedelta(hours=timezonediff)).time()),
+                                        *cur_val                                               
+                                    ),
+                                )
+                                next_dt=self.roundTime(next_dt,self.roundTo)
 
                         if self.data:
                             if data_type == 'Average':
@@ -239,50 +277,43 @@ class ParseData:
             print(e)
     def create_chart(self,column_start,row_start,row_end,column_end=None):
         def type1():
-            pass
+            from openpyxl.chart import AreaChart
+            chart = AreaChart()
+            return chart
         def type2():
-            pass
+            from openpyxl.chart import BarChart
+            chart = BarChart()
+            chart.type='col'
+            return chart
         def type3():
-            pass
+            from openpyxl.chart import BarChart
+            chart = BarChart()
+            chart.type='bar'
+            return chart
         def type4():
-            pass
-        def type5():
-            pass
-        def type6():
-            from openpyxl.chart import LineChart,Reference
-            from openpyxl.chart.axis import DateAxis
+            from openpyxl.chart import LineChart
+            # from openpyxl.chart.axis import DateAxis
             chart = LineChart()
-            chart.style = 13
-            chart.title = self.object_fullpaths[self.chart_counter]
-            self.chart_counter+=1
-            chart.y_axis.title = 'Value'
-            chart.y_axis.crossAx = 500
-            chart.x_axis = DateAxis(crossAx=100)
-            chart.x_axis.title = 'time'
-            data = Reference(self.ws,min_col=column_start,max_col=column_end,min_row=row_start,max_row=row_end)
-            chart.add_data(data,titles_from_data=True)
-            dates = Reference(self.ws,min_col=2,min_row=row_start+1,max_row=row_end)
-            chart.set_categories(dates)
-            self.ws.add_chart(chart,cell.get_column_letter(column_start)+str(self.ws.max_row+1))
-
-        def type7():
-            pass
-        def type8():
-            pass
-        def type9():
-            pass
+            return chart
+        def type0():
+            return
         self.chart_options = {
             1:type1,
             2:type2,
             3:type3,
             4:type4,
-            5:type5,
-            6:type6,
-            7:type7,
-            8:type8,
-            0:type9,
+            0:type0,
         }
-        self.chart_options[self.customization['Excel'][3]]()
+        chart = self.chart_options[self.customization['Excel'][3]]()
+        from openpyxl.chart import Reference
+        chart.style = 42
+        chart.title = self.object_fullpaths[self.chart_counter]
+        self.chart_counter+=1
+        data = Reference(self.ws,min_col=column_start,max_col=column_end,min_row=row_start,max_row=row_end)
+        chart.add_data(data,titles_from_data=True)
+        cats = Reference(self.ws,min_col=1,max_col=2,min_row=row_start+1,max_row=row_end)
+        chart.set_categories(cats)
+        self.ws.add_chart(chart,cell.get_column_letter(column_start)+str(self.ws.max_row+1))
     def create_one_sheet_table(self,signal_type,data_type):
         def header_build(step,column=3):
             for i,path in enumerate(self.object_fullpaths,start=1):
@@ -371,8 +402,8 @@ class ParseData:
         style = TableStyleInfo(name='TableStyleMedium9',showColumnStripes=True,showRowStripes=False)
         tab.tableStyleInfo = style
         self.ws.add_table(tab)
-        if self.customization['Excel'][3]:
-            for i in range(6,step*len(self.object_fullpaths)+3,step):
+        if self.customization['Excel'][3] and signal_type in ['All Measurements','All Metering']:
+            for i in range(6,6+step*(len(self.object_fullpaths)-1)+1,step):
                 if data_type in ['Average','Consumption']:
                     self.create_chart(column_start=i,column_end=i+1,row_start=table_row_start,row_end=table_row_end)
                 else:
@@ -384,7 +415,6 @@ class ParseData:
         self.sheet_index = 1
         def build(index,step):
             column = 1
-            column_val_start = 6
             for j in range(1,step+1):
                 self.ws.column_dimensions[cell.get_column_letter(j)].width=25
             base_cell = self.ws.cell(row=self.cur_row, column=column)
@@ -420,7 +450,11 @@ class ParseData:
             style = TableStyleInfo(name='TableStyleMedium9',showColumnStripes=True,showRowStripes=False)
             tab.tableStyleInfo = style
             self.ws.add_table(tab)
-            self.create_chart(column_start=column_val_start,row_start=table_row_start,row_end=table_row_end)
+            if signal_type in ['All Measurements','All Metering']:
+                if data_type in ['Average','Consumption']:
+                    self.create_chart(column_start=6,column_end=7,row_start=table_row_start,row_end=table_row_end)
+                else:
+                    self.create_chart(column_start=step,row_start=table_row_start,row_end=table_row_end)
             if self.template_path:
                 self.ws = self.wb.copy_worksheet(self.ws_template)
                 self.ws.title = str(self.sheet_index)
@@ -475,20 +509,20 @@ class ParseData:
 
 if __name__ == "__main__":
 
-    b=ParseData(datetime.datetime(2019,7,22,12,39),datetime.datetime(2019,7,22,12,55),'GMT+4:00',False,[
-      'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / ACTIVE POWER(P)',
-      'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / CURRENT IB',
-      'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / VOLTAGE VRY',
-      'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / FREQUENCY'
-  ],'All Measurements',5,1,'Average') #65,2,25 
+#     b=ParseData(datetime.datetime(2019,7,22,12,54),datetime.datetime(2019,7,22,12,55),'GMT+4:00',False,[
+#       'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / ACTIVE POWER(P)',
+#       'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / CURRENT IB',
+#       'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / VOLTAGE VRY',
+#       'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / FREQUENCY'
+#   ],'All Measurements',5,1,'Average') #65,2,25 
 #     b=ParseData(datetime.datetime(2019,7,22,12,39),datetime.datetime(2019,7,22,12,55),'GMT+4:00',True,[
 #       'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / ACTIVE POWER(P)',
 #       'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / CURRENT IB',
 #       'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / VOLTAGE VRY',
 #       'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / FREQUENCY'
 #   ],'All Measurements') #65,2,25 
-    # c=ParseData(datetime.datetime(2019,7,4,10,41),datetime.datetime(2019,7,4,11,0),'GMT+4:00',True,[
-    #     'MOSG / 33KV / H12_13 BUS SEC / Q0 CB / POSITION'
-    # ],'All Signals')
-    print(b.result)
+    c=ParseData(datetime.datetime(2019,7,4,10,41),datetime.datetime(2019,7,4,11,0),'GMT+4:00',True,[
+        'MOSG / 33KV / H12_13 BUS SEC / Q0 CB / POSITION'
+    ],'All Signals')
+    print(c.result)
  
