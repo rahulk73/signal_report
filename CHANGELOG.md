@@ -2,6 +2,20 @@
 All notable changes (Added features,depracated features,removed features,changed functionalities and bug fixes) will be documented in this file.
 
 ##[Unreleased]
+## [0.15.11] 2019-07-30
+##Added
+-Event report support. Now there is seggeregation between analog report and event report.
+-Buffer date concept.
+-Day,week,month options for analog report.
+-About menu.
+
+##Changed
+-Changed xlsscript layout completely. Now conforms more closely to OOP.
+-Optomised speed by adding date clauses in mysql querry for MV and MT signals.
+
+##Fixed
+-Small bugs
+
 ## [0.11.10] 2019-07-28
 ##Added
 -Chart support for 4 types of charts (Area,Vertical-Var,Horizontal-Bar,Line).

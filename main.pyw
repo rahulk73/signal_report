@@ -10,14 +10,12 @@ from tkinter import ttk
 from checkboxtreeview import CheckboxTreeview
 import datetime
 from tkcalendar import Calendar
-from xlsscript import ParseData,Preferences
+from xlsscript import AnalogReport,Preferences,EventReport
 from sqlscript import GetSignals
 from signaltree import Tree,Node
 import threading
 import pickle
 from os import system,path,mkdir,remove
-w=1400
-h=700
 
 class ExcelPreferences(tk.Frame):
     def __init__(self,parent,MainApp,options):
@@ -50,11 +48,8 @@ class ExcelPreferences(tk.Frame):
         self.seperate_worksheet_checkbutton.grid(row=1,column=1)
 
         tk.Label(self,text='Default chart').grid(row=2,column=0,sticky='w',rowspan=2)
-        i,j=1,1
-        for text,mode in self.MODES:
-                tk.Radiobutton(self,text=text,variable=self.chart_var,value=mode).grid(row=2,column=i)
-                i+=1
-
+        for i,mode in enumerate(self.MODES,start=1):
+                tk.Radiobutton(self,text=mode[0],variable=self.chart_var,value=mode[1]).grid(row=2,column=i)
     def column_hide(self,*args):
         self.options[1]=self.column_hide_var.get()
     def seperate_worksheet(self,*args):
@@ -148,15 +143,7 @@ class Navbar(tk.Frame):
         self.parent.optionmenu_mt.place_forget()
         self.parent.optionmenu_mv.place_forget()
         if self.optionvar.get() in self.OPTIONS[:-2]:
-            self.parent.advanbutton['state']='disabled'
-            if not self.parent.hidden:
-                self.parent.advanbtn_text.set("Show Advanced Options")
-                self.parent.delete('showtext')
-                self.parent.fqentry.place_forget()
-                self.parent.radiobutton1.place_forget()
-                self.parent.radiobutton2.place_forget()
-                self.parent.radiobutton3.place_forget()
-                self.parent.hidden=True  
+            self.parent.disable_advance()
             if self.optionvar.get() == 'All Controls':
                 self.build_tree('', self.control,self.control.data,root=True)
             elif self.optionvar.get() == 'All Signals':
@@ -173,6 +160,13 @@ class Navbar(tk.Frame):
             self.build_tree('', self.meter,self.meter.data,root=True)
         
         self.parent.advanbutton['state']='normal'
+    def report_change(self,report_type):
+        if report_type == self.parent.reportOPTIONS[0]:
+            self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS,command=self.callback)
+        else:
+            self.optionvar.set(self.OPTIONS[0])
+            self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS[:-2],command=self.callback)
+        self.optionmenu.grid(row=0,column=2)
 
 
 class MainApplication(tk.Canvas):
@@ -182,6 +176,7 @@ class MainApplication(tk.Canvas):
         self.setup()
         self.menubar = tk.Menu(self.parent)
         self.menubar.add_command(label='Preferences',command=self.preferencesWindow)
+        self.menubar.add_command(label='About',command=self.aboutWindow)
         self.parent.config(menu=self.menubar)
         self.navbar=Navbar(self)
         self.navbar.place(x=700,y=80)
@@ -197,15 +192,16 @@ class MainApplication(tk.Canvas):
         self.thour.place(x=255,y=70)
         self.create_text(285,70,text=":",fill='white',anchor='nw',font=("Arial", 12, "bold"))
         self.tmin.place(x=295,y=70)
-        self.timezonemenu.place(x=350,y=23)
-        self.advanbutton.place(x=470,y=25)
+        self.timezonemenu.place(x=490,y=23)
+        self.report_type_menu.place(x=350,y=23)
+        self.advanbutton.place(x=610,y=25)
         self.create_text(15,200,text="Object Path(s): ",fill='white',anchor='nw',font=("Arial", 12, "bold"))
         self.container.place(x=150,y=200)
         self.listbox.grid()
         self.ysb.grid(row=0, column=1, sticky='ns')
-        self.template_text_box.place(x=350,y=560)
-        self.template_browse_button.place(x=1050,y=560)
-        self.template_clear_button.place(x=1200,y=560)
+        self.template_text_box.place(x=350,y=570)
+        self.template_browse_button.place(x=1050,y=570)
+        self.template_clear_button.place(x=1200,y=570)
         self.cbutton.place(x=150,y=560)
     def extract(self):
         def thread_extract():
@@ -216,43 +212,81 @@ class MainApplication(tk.Canvas):
                 self.template_path = self.template_text_box.get('1.0',tk.END).rstrip()
             else:
                 self.template_path = None
-            if self.hidden:
-                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get())),
-                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get())),
-                self.timezonevar.get(),self.hidden,self.object_fullpaths,self.navbar.optionvar.get(),template_path=self.template_path)
-                found=extraction.result
+            if self.report_type_var.get() == self.reportOPTIONS[1] and len(self.object_fullpaths)<1:
+                if self.event_duration_var.get() != self.eventdurationOPTIONS[-1]:
+                    time_unit = dict(zip(self.eventdurationOPTIONS[:-1],[
+                        60,
+                        60*60,
+                        24*60*60,
+                        7*24*60*60,
+                        30*24*60*60,
+                        365*24*60*60
+                    ]))
+                    seconds = -1*int(self.fqentry2.get())*(time_unit.get(self.event_duration_var.get()))
+                    fdate = datetime.datetime.now() + datetime.timedelta(seconds=seconds)
+                    tdate = datetime.datetime.now()
+                else:
+                    fdate = datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get()))
+                    tdate =  datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get()))
+                report = EventReport(
+                    fdate,
+                    tdate,
+                    self.timezonevar.get(),
+                    self.template_path,
+                )
+
+
+            elif self.hidden:
+                report = AnalogReport(
+                    datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get())),
+                    datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get())),
+                    self.timezonevar.get(),
+                    self.hidden,
+                    self.object_fullpaths,
+                    self.navbar.optionvar.get(),
+                    template_path=self.template_path,           
+                )
             else:
                 if self.navbar.optionvar.get() == 'All Measurements':
-                    option = self.optionvar_mv.get()
+                    data_type = self.optionvar_mv.get()
                 else:
-                    option = self.optionvar_mt.get()
-                extraction=ParseData(datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get())),
-                datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get())),
-                self.timezonevar.get(),self.hidden,self.object_fullpaths,self.navbar.optionvar.get(),
-                self.fqentry.get(),self.radb.get(),option,self.template_path)
-                found=extraction.result       
+                    data_type = self.optionvar_mt.get()
+                report = AnalogReport(
+                    datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get())),
+                    datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get())),
+                    self.timezonevar.get(),
+                    self.hidden,
+                    self.object_fullpaths,
+                    self.navbar.optionvar.get(),
+                    self.fqentry.get(),
+                    self.radb.get(),
+                    data_type,
+                    self.template_path
+                )
+
+            found=report.result       
             self.progress.stop()
             self.progress.place_forget()
+            self.configure_all(state='normal')
             if found==-3:
                 tk.messagebox.showerror("Error","Too much data to process. Narrow down your search criteria and try again")
             elif found==-2:
-                tk.messagebox.showerror("Error","Sorry,something went wrong.\n"+extraction.errormessage)
+                tk.messagebox.showerror("Error","Sorry,something went wrong.\n"+report.errormessage)
             elif found==-1:
                 tk.messagebox.showerror("Error","Close the excel file and try again.")
             elif found==0:
                 tk.messagebox.showwarning("Info","No data was found for the selected signal(s).")
             elif found==1:
                 tk.messagebox.showinfo("Extraction Successful !","You can view the records in the file tables.xlsx")
-                system("start EXCEL.EXE \"{}\"".format(extraction.file_path))
+                system("start EXCEL.EXE \"{}\"".format(report.file_path))
             elif found==2:
-                tk.messagebox.showwarning("Info","Records for the following data could not be found-\n"+',\n'.join(extraction.not_found))
-                system("start EXCEL.EXE \"{}\"".format(extraction.file_path))
+                tk.messagebox.showwarning("Info","Records for the following data could not be found-\n"+',\n'.join(report.not_found))
+                system("start EXCEL.EXE \"{}\"".format(report.file_path))
         if not self.datetimecheck():
             tk.messagebox.showerror("Date Error","The time interval is invalid. Try Again")
             return
-        self.disable_all()        
+        self.configure_all(state='disabled')        
         threading.Thread(target=thread_extract).start()
-        self.enable_all()
         
     def setup(self):
         self.to_datetime = datetime.datetime.now()
@@ -279,14 +313,30 @@ class MainApplication(tk.Canvas):
         self.tstr=tk.StringVar(self,self.date_format(self.tdate))
         self.tlabel=tk.Label(self,textvariable=self.tstr,width=10)
         self.photoimage=tk.PhotoImage(file="./img/bgimage.png")
-        self.parent.geometry("%dx%d" % (w,h))
-        self.parent.title("Create Exel Log File")
+        self.resize_dim = (1400,700)
+        self.parent.geometry("{0}x{1}+0+0".format(self.parent.winfo_screenwidth(),self.parent.winfo_screenheight()))
+        self.parent.title("Signal Report")
         self.advanbtn_text=tk.StringVar(self,value="Show Advanced Options")
         self.advanbutton=tk.Button(self,textvariable=self.advanbtn_text,command=self.advance)
         self.advanbutton['state']='disabled'
         self.hidden=True
         self.fqvar=tk.StringVar(self,value='1')
+        self.fqentry=tk.Entry(self,width=2,textvariable=self.fqvar)
+        self.reg1=self.register(self.freq_valid)
+        self.fqentry.config(validate='key',validatecommand=(self.reg1,'%P'))
+        self.fqentry.bind('<FocusOut>',self.freq_focusout)
+        self.fqvar2=tk.StringVar(self,value='1')
+        self.fqentry2=tk.Entry(self,width=2,textvariable=self.fqvar)
+        self.reg1=self.register(self.freq_valid)
+        self.fqentry2.config(validate='key',validatecommand=(self.reg1,'%P'))
+        self.fqentry2.bind('<FocusOut>',self.freq_focusout)
         self.radb=tk.IntVar(self,2)
+        self.radiobutton1=tk.Radiobutton(self,text="Second(s)",value=1,variable=self.radb)
+        self.radiobutton2=tk.Radiobutton(self,text="Minute(s)",value=2,variable=self.radb)
+        self.radiobutton3=tk.Radiobutton(self,text="Hour(s)",value=3,variable=self.radb)
+        self.radiobutton4=tk.Radiobutton(self,text="Day(s)",value=4,variable=self.radb)
+        self.radiobutton5=tk.Radiobutton(self,text="Week(s)",value=5,variable=self.radb)
+        self.radiobutton6=tk.Radiobutton(self,text="Month(s)",value=6,variable=self.radb)
         self.OPTIONS_MEASUREMENT=['Changes','Average']
         self.OPTIONS_METERING = ['Changes','Consumption']
         self.optionvar_mv=tk.StringVar(self)
@@ -347,10 +397,68 @@ class MainApplication(tk.Canvas):
         self.template_text_box['state']='disabled'
         self.template_browse_button = tk.Button(self,text='Browse',command=self.file_explore,width=20,height=1)
         self.template_clear_button = tk.Button(self,text='Clear',command=self.clear_template_path,width=20,height=1)
+        self.reportOPTIONS = (
+            'Analog Report',
+            'Event Report',
+        )
+        self.eventdurationOPTIONS = (
+            'Minute(s)',
+            'Hour(s)',
+            'Day(s)',
+            'Week(s)',
+            'Month(s)',
+            'Year(s)',
+            'Custom',
+        )
+        self.event_duration_var = tk.StringVar(self,value=self.eventdurationOPTIONS[1])
+        self.event_duration_var.trace('w',self.eventDurationCallback)
+        self.event_duration_menu = tk.OptionMenu(self,self.event_duration_var,*self.eventdurationOPTIONS)
+        self.event_duration_menu.config(width=10)
+        self.report_type_var = tk.StringVar(self,value=self.reportOPTIONS[0])
+        self.prev_report_type = self.report_type_var.get()
+        self.report_type_var.trace('w',self.changeReportScreen)
+        self.report_type_menu = tk.OptionMenu(self,self.report_type_var,*self.reportOPTIONS)
         self.cbutton=tk.Button(self,text="Create Excel Report!",command=self.extract,width=20,height=2)
         self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL,length=200,  mode='determinate')
         if not path.isdir('./Templates'):
             mkdir('./Templates')
+    def changeReportScreen(self,*args):
+        if self.prev_report_type == self.report_type_var.get():
+            return
+        {self.reportOPTIONS[0]:self.changeToEvent,self.reportOPTIONS[1]:self.changeToAnalog}.get(self.prev_report_type)()
+        self.navbar.report_change(self.report_type_var.get())
+    def changeToAnalog(self):
+        self.delete('event_text')
+        self.fqentry2.place_forget()
+        self.event_duration_menu.place_forget()
+        self.event_duration_var.set(self.eventdurationOPTIONS[-1])
+
+        self.prev_report_type = self.reportOPTIONS[0]
+    def changeToEvent(self):
+        self.create_text(150,105,text="Last",fill='white',anchor='nw',font=("Arial",12,'bold'),tag='event_text')
+        self.fqentry2.place(x=200,y=105)
+        self.event_duration_menu.place(x=225,y=100)
+        self.disable_advance()
+        self.event_duration_var.set(self.eventdurationOPTIONS[1])
+
+        self.prev_report_type = self.reportOPTIONS[1]
+    def eventDurationCallback(self,*args):
+        if self.event_duration_var.get() == self.eventdurationOPTIONS[-1]:
+            state = 'normal'
+            self.delete('event_text')
+            self.fqentry2.place_forget()
+        else:
+            state='disabled'
+            self.fqentry2.place(x=200,y=105)
+            self.create_text(150,105,text="Last",fill='white',anchor='nw',font=("Arial",12,'bold'),tag='event_text')
+        self.fbutton['state']=state
+        self.tbutton['state']=state
+        self.fhour.config(state=state)
+        self.thour.config(state=state)
+        self.fmin.config(state=state)
+        self.tmin.config(state=state)
+        
+
     def preferencesWindow(self):
         def save_quit():
             self.customization = pref.options
@@ -372,6 +480,13 @@ class MainApplication(tk.Canvas):
         button1.grid(row=2,column=1)
         button2.grid(row=2,column=2)
         button3.grid(row=2,column=3)
+    def aboutWindow(self):
+        self.about_message = """Version 0.15.11 
+Commit 5dc11b04af0359ed8e1aa8a868d1d03bcfa26d52
+Signal Report© (All Rights Reserved) is an open source project that was created by Farhan Ali, Arun Aery and Rahul Kumar at Schneider Eletric Dubai.
+
+        """
+        tk.messagebox.showinfo("About",self.about_message)
 
     def fgetdate(self):
         def print_sel():
@@ -401,13 +516,6 @@ class MainApplication(tk.Canvas):
         ttk.Button(self.ttop, text="Go", command=print_sel).pack()
     def advance(self):
         if self.hidden:
-            self.radiobutton1=tk.Radiobutton(self,text="Second(s)",value=1,variable=self.radb)
-            self.radiobutton2=tk.Radiobutton(self,text="Minute(s)",value=2,variable=self.radb)
-            self.radiobutton3=tk.Radiobutton(self,text="Hour(s)",value=3,variable=self.radb)
-            self.fqentry=tk.Entry(self,width=2,textvariable=self.fqvar)
-            self.reg1=self.register(self.freq_valid)
-            self.fqentry.config(validate='key',validatecommand=(self.reg1,'%P'))
-            self.fqentry.bind('<FocusOut>',self.freq_focusout)
             self.advanbtn_text.set("Hide Advanced Options")
             self.create_text(15,150,text="Show\t\t\tevery".expandtabs(11),fill='white',anchor='nw',font=("Arial",12,'bold'),tag='showtext')
             if self.navbar.optionvar.get() == 'All Measurements':
@@ -417,17 +525,38 @@ class MainApplication(tk.Canvas):
             self.fqentry.place(x=230,y=153)
             self.radiobutton1.place(x=260,y=150)
             self.radiobutton2.place(x=340,y=150)
-            self.radiobutton3.place(x=420,y=150)
+            self.radiobutton3.place(x=415,y=150)
+            self.radiobutton4.place(x=480,y=150)
+            self.radiobutton5.place(x=540,y=150)
+            self.radiobutton6.place(x=605,y=150)
         else:
             self.advanbtn_text.set("Show Advanced Options")
             self.delete('showtext')
             self.fqentry.place_forget()
             self.radiobutton1.place_forget()
             self.radiobutton2.place_forget()
+            self.radiobutton3.place_forget()
+            self.radiobutton4.place_forget()
+            self.radiobutton5.place_forget()
+            self.radiobutton6.place_forget()
             self.optionmenu_mv.place_forget()
             self.optionmenu_mt.place_forget()
-            self.radiobutton3.place_forget()
         self.hidden = not self.hidden
+    def disable_advance(self):
+        self.advanbutton['state']='disabled'
+        if not self.hidden:
+            self.advanbtn_text.set("Show Advanced Options")
+            self.delete('showtext')
+            self.fqentry.place_forget()
+            self.radiobutton1.place_forget()
+            self.radiobutton2.place_forget()
+            self.radiobutton3.place_forget()
+            self.radiobutton4.place_forget()
+            self.radiobutton5.place_forget()
+            self.radiobutton6.place_forget()
+            self.optionmenu_mv.place_forget()
+            self.optionmenu_mt.place_forget()
+            self.hidden=True 
     def datetimecheck(self):
         if self.fhour.get() and self.fmin.get() and self.thour.get() and self.tmin.get():
             return (datetime.datetime.combine(self.fdate,datetime.time(hour=int(self.fhour.get()),minute=int(self.fmin.get())))
@@ -477,31 +606,30 @@ class MainApplication(tk.Canvas):
     def freq_focusout(self,*args):
         if self.fqvar.get() == '':
             self.fqvar.set(1)
-    def disable_all(self):
-        self.cbutton['state']='disabled'
-        self.template_browse_button['state']='disabled'
-        self.template_clear_button['state']='disabled'
-        self.advanbutton['state']='disabled'
-        self.fbutton['state']='disabled'
-        self.tbutton['state']='disabled'
+        if self.fqvar2.get() == '':
+            self.fqvar2.set(1)
+    def configure_all(self,state):
+        self.cbutton['state']=state
+        self.template_browse_button['state']=state
+        self.template_clear_button['state']=state
+        self.advanbutton['state']=state
+        self.fbutton['state']=state
+        self.tbutton['state']=state
+        self.event_duration_menu['state']=state
+        self.report_type_menu['state']=state
+        self.fqentry2['state']=state
+        self.navbar.optionmenu['state']=state
+        self.timezonemenu['state']=state
         if not self.hidden:
-            self.radiobutton1['state']='disabled'
-            self.radiobutton2['state']='disabled'
-            self.radiobutton3['state']='disabled'
-            self.fqentry['state']='disabled'
-            self.optionmenu_mv['state']='disabled'
-    def enable_all(self):
-        self.cbutton['state']='normal'
-        self.template_browse_button['state']='normal'
-        self.template_clear_button['state']='normal'
-        self.advanbutton['state']='normal'
-        self.fbutton['state']='normal'
-        if not self.hidden:
-            self.radiobutton1['state']='normal'
-            self.radiobutton2['state']='normal'
-            self.radiobutton3['state']='normal'
-            self.fqentry['state']='normal'
-            self.optionmenu_mv['state']='normal'
+            self.radiobutton1['state']=state
+            self.radiobutton2['state']=state
+            self.radiobutton3['state']=state
+            self.radiobutton4['state']=state
+            self.radiobutton5['state']=state
+            self.radiobutton6['state']=state
+            self.fqentry['state']=state
+            self.optionmenu_mv['state']=state
+            self.optionmenu_mt['state']=state
     def date_format(self,date):
         return(str(datetime.datetime.strptime(str(date),"%Y-%m-%d").strftime("%d/%m/%Y")))
 if  __name__=='__main__':
