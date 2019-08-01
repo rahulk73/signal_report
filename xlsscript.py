@@ -6,7 +6,7 @@ import datetime
 import re
 from os import path as os_path
 from os import mkdir
-from sqlscript import GetSignalDataAnalog,GetSignalDataEvent 
+from sqlscript import GetSignalDataAnalog,GetSignalDataEvent,AccessDeniedError
 import pickle
 class SingleSheet():
     def __init__(self,all_signal_data,object_fullpaths,signal_type,data_type,customization,template_path,file_path,column=3):
@@ -281,6 +281,12 @@ class Preferences:
     },
     'Template':{
         1:'',
+    },
+    'MySQL':{
+        'sh':'localhost',
+        'un':'mcisadmin',
+        'pw':'s$e!P!C!L@2014',
+        'db':'pacis',
     }
 }
 class Increment():
@@ -307,10 +313,10 @@ class ExcessiveDataError(Exception):
 class AnalogReport:
     def __init__(self,fdate,tdate,timezone,hidden,object_fullpaths,signal_type,fq=None,radb=None,data_type='Changes',template_path=None):
         try:
-            self.str_time=datetime.datetime.now().strftime('%a %d %b %y %I-%M-%S%p')
+            self.str_time=datetime.datetime.now().strftime('%y%m%d%H%M%S')
             if not os_path.isdir('./SignalLog'):
                 mkdir('./SignalLog')
-            self.file_path = './SignalLog/'+self.str_time+'.xlsx'
+            self.file_path = './SignalLog/'+self.str_time+' Analog.xlsx'
             self.template_path = template_path #= "C:/Users/OISM/Desktop/SignalReportApp/Templates/template1.xlsx"
             self.fdate = fdate
             self.tdate = tdate
@@ -331,7 +337,13 @@ class AnalogReport:
             self.signal_info=[]
             self.all_signal_data=[]
             for path in self.object_fullpaths:
-                self.signal_info.append(GetSignalDataAnalog(path,self.signal_type,self.fdate,self.tdate))
+                self.signal_info.append(GetSignalDataAnalog(
+                    path,
+                    self.signal_type,
+                    self.fdate,
+                    self.tdate,
+                    **self.customization['MySQL']
+                ))
             for signal in self.signal_info:
                 self.data=[]
                 self.unparsed_data = signal.result
@@ -375,12 +387,14 @@ class AnalogReport:
                     self.result = 1
             else:
                 self.result = 0
-        except PermissionError:
+        except AccessDeniedError:
             self.result = -1
+        except PermissionError:
+            self.result = -2
         except ExcessiveDataError:
             self.result = -3
         except Exception as e:
-            self.result = -2
+            self.result = -4
             self.errormessage = str(e)
             print(e)
     def analog_advanced(self):
@@ -551,16 +565,12 @@ class AnalogReport:
     def event_selected(self):
         for dt,ms,em,eu in self.unparsed_data:
             dt+=datetime.timedelta(milliseconds=ms)
-            match=re.findall('.+=(.+)',eu)
-            if match:
-                match=match[0]
-            else:
-                match=''
+            eu = eu.replace('=',' / ')
             self.data.append(
                 (
                     str((dt+datetime.timedelta(hours=self.timezonediff)).date()),
                     str((dt+datetime.timedelta(hours=self.timezonediff)).time()),
-                    em,match
+                    em,eu
                 )
             )
 
@@ -579,10 +589,11 @@ class AnalogReport:
 class EventReport:
     def __init__(self,fdate,tdate,timezone,template_path=None):
         try:
-            self.str_time=datetime.datetime.now().strftime('%a %d %b %y %I-%M-%S%p')
+            # self.str_time=datetime.datetime.now().strftime('%a %d %b %y %I-%M-%S%p')
+            self.str_time=datetime.datetime.now().strftime('%y%m%d%H%M%S')
             if not os_path.isdir('./SignalLog'):
                 mkdir('./SignalLog')
-            self.file_path = './SignalLog/'+self.str_time+'.xlsx'
+            self.file_path = './SignalLog/'+self.str_time+' event.xlsx'
             self.template_path = template_path #= "C:/Users/OISM/Desktop/SignalReportApp/Templates/template1.xlsx"
             self.fdate = fdate
             self.tdate = tdate
@@ -598,20 +609,16 @@ class EventReport:
             else:
                 self.customization = Preferences.options_default
 
-            signal = GetSignalDataEvent(self.fdate,self.tdate)
+            signal = GetSignalDataEvent(self.fdate,self.tdate,**self.customization['MySQL'])
             self.unparsed_data = signal.result
             for dt,ms,oo,od,em,eq,eu in self.unparsed_data:
                 dt+=datetime.timedelta(milliseconds=ms)
-                match=re.findall('.+=(.+)',eu)
-                if match:
-                    match=match[0]
-                else:
-                    match=''
+                eu = eu.replace('=',' / ')
                 self.data.append(
                     (
                         str((dt+datetime.timedelta(hours=self.timezonediff)).date()),
                         str((dt+datetime.timedelta(hours=self.timezonediff)).time()),
-                        oo,od,em,eq,match,
+                        oo,od,em,eq,eu,
                     )
                 )
             if self.data:
@@ -627,12 +634,14 @@ class EventReport:
                 self.result = 1
             else:
                 self.result = 0
-        except PermissionError:
+        except AccessDeniedError:
             self.result = -1
+        except PermissionError:
+            self.result = -2
         except ExcessiveDataError:
             self.result = -3
         except Exception as e:
-            self.result = -2
+            self.result = -4
             self.errormessage = str(e)
             print(e)
 

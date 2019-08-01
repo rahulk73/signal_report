@@ -2,6 +2,9 @@ import pymysql.cursors
 import datetime
 import re
 import datetime
+
+class AccessDeniedError(Exception):
+    pass
 def generator(cursor,size=100):
     while True:
         rows=cursor.fetchmany(size)
@@ -10,15 +13,18 @@ def generator(cursor,size=100):
         for row in rows:
             yield row
 class GetSignalDataAnalog:
-    def __init__(self,object_fullpath,signal_type,fdate,tdate):
+    def __init__(self,object_fullpath,signal_type,fdate,tdate,sh,un,pw,db):
         self.option={'All Signals':frozenset(['mappingsps','cs_voltageabsence_sps','cs_authostate_sps','cs_onoff_sps','cs_voltagerefpresence_sp','computedswitchpos_dps',
         'cs_busbarvchoice_sps','cs_acceptforcing_sps','groupsps','tapfct','cs_voltagepresence_sps','cs_closeorderstate_sps','userfunctionsps',
         'cs_voltagerefabsence_sps','moduledps','modulesps']),'All Controls': frozenset(['modulespc','switch_dpc','cs_ctrlonoff_spc','moduledpc']),
         'All Measurements':frozenset(['modulemv']),'All Metering':frozenset(['modulemeter'])}
         self.object_fullpath = object_fullpath
         self.result=()
-        self.connection=pymysql.connect(host='localhost',user='mcisadmin',password='s$e!P!C!L@2014',db='pacis')
         buffer_fdate = fdate + datetime.timedelta(minutes=-10)
+        try:
+            self.connection=pymysql.connect(host=sh,user=un,password=pw,db=db)
+        except pymysql.err.OperationalError:
+            raise AccessDeniedError
         try:
             self.result = None
             with self.connection.cursor() as cursor:
@@ -43,6 +49,8 @@ class GetSignalDataAnalog:
                         """.format(self.uid,fdate,tdate)
                         cursor.execute(self.sql)
                         self.result=generator(cursor)
+        except pymysql.err.OperationalError:
+            raise AccessDeniedError
         except pymysql.err.ProgrammingError:
             self.result = None
         except Exception as e:
@@ -52,9 +60,12 @@ class GetSignalDataAnalog:
             self.connection.close()
 
 class GetSignalDataEvent:
-    def __init__(self,fdate,tdate):
+    def __init__(self,fdate,tdate,sh,un,pw,db):
         self.result=()
-        self.connection=pymysql.connect(host='localhost',user='mcisadmin',password='s$e!P!C!L@2014',db='pacis')
+        try:
+            self.connection=pymysql.connect(host=sh,user=un,password=pw,db=db)
+        except pymysql.err.OperationalError:
+            raise AccessDeniedError
         try:
             self.result = None
             with self.connection.cursor() as cursor:
@@ -75,14 +86,19 @@ class GetSignalDataEvent:
         finally:
             self.connection.close()
 class GetSignals:
-    def __init__(self):
+    def __init__(self,sh,un,pw,db):
         self.result=()
-        self.connection=pymysql.connect(host='localhost',user='mcisadmin',password='s$e!P!C!L@2014',db='pacis')
+        try:
+            self.connection=pymysql.connect(host=sh,user=un,password=pw,db=db)
+        except pymysql.err.OperationalError:
+            raise AccessDeniedError
         try:
             with self.connection.cursor() as cursor:
                 self.sql="SELECT object_fullpath,object_typ0,object_typ5,object_iecsignaladdr FROM objects order by object_fullpath"
                 cursor.execute(self.sql)
                 self.result=generator(cursor)
+        except pymysql.err.OperationalError:
+            raise AccessDeniedError
         except Exception as e:
             print(e)
             self.result=-2

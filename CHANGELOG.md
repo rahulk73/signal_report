@@ -2,6 +2,18 @@
 All notable changes (Added features,depracated features,removed features,changed functionalities and bug fixes) will be documented in this file.
 
 ##[Unreleased]
+## [0.15.13] 2019-08-01
+##Added
+-Preference support for mysql credentials.
+
+##Changed
+-Background image, widget layouts.
+-Event command origin just replacing '=' for '/' now.
+
+##Fixed
+-'Not found' bug.
+-Signal tree options changing based on report type.
+
 ## [0.15.11] 2019-07-30
 ##Added
 -Event report support. Now there is seggeregation between analog report and event report.

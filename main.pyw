@@ -1,9 +1,8 @@
 """
-Application to extract data from a table on a mysql database based on a predifned frequency interval
-and load this data on an excel spreadsheet.
 Credits:
-
 Icon made by VisualPharm at icon-icons.com/icon/database-the-application/2803 (License : CC Attribution)
+Background Image by <a href="https://pixabay.com/users/Clker-Free-Vector-Images-3736/?utm_source=link-attribution&amp;utm_medium=referral&amp;utm_campaign=image&amp;utm_content=34536">Clker-Free-Vector-Images</a> from <a href="https://pixabay.com/?utm_source=link-attribution&amp;utm_medium=referral&amp;utm_campaign=image&amp;utm_content=34536">Pixabay</a>
+
 """
 import tkinter as tk
 from tkinter import ttk
@@ -11,7 +10,7 @@ from checkboxtreeview import CheckboxTreeview
 import datetime
 from tkcalendar import Calendar
 from xlsscript import AnalogReport,Preferences,EventReport
-from sqlscript import GetSignals
+from sqlscript import GetSignals,AccessDeniedError
 from signaltree import Tree,Node
 import threading
 import pickle
@@ -76,6 +75,43 @@ class TemplatePreferences(tk.Frame):
 
     def set_default_template(self):
         self.options[1] = self.default_template_label['text']=self.mainapp.template_text_box.get('1.0',tk.END)
+class MySQLPreferences(tk.Frame):
+    def __init__(self,parent,MainApp,options):
+        tk.Frame.__init__(self,parent)
+        self.grid_columnconfigure(0,weight=1)
+        self.parent = parent
+        self.options = options
+        self.mainapp = MainApp
+
+        tk.Label(self,text='Server Host').grid(row=0,column=0,sticky='w')
+        self.host_var = tk.StringVar(self,self.options['sh'])
+        self.host_var.trace('w',self.callback)
+        tk.Entry(self,textvariable=self.host_var).grid(row=0,column=1,sticky='e')
+
+        tk.Label(self,text='Username').grid(row=1,column=0,sticky='w')
+        self.un_var = tk.StringVar(self,self.options['un'])
+        self.un_var.trace('w',self.callback2)
+        tk.Entry(self,textvariable=self.un_var).grid(row=1,column=1,sticky='e')
+
+        tk.Label(self,text='Password').grid(row=2,column=0,sticky='w')
+        self.pw_var = tk.StringVar(self,self.options['pw'])
+        self.pw_var.trace('w',self.callback3)
+        tk.Entry(self,textvariable=self.pw_var,show='*').grid(row=2,column=1,sticky='e')
+
+        tk.Label(self,text='Default Schema').grid(row=3,column=0,sticky='w')
+        self.db_var = tk.StringVar(self,self.options['db'])
+        self.db_var.trace('w',self.callback4)
+        tk.Entry(self,textvariable=self.db_var).grid(row=3,column=1,sticky='e')
+
+    def callback(self,*args):
+        self.options['sh'] = self.host_var.get()
+    def callback2(self,*args):
+        self.options['un'] = self.un_var.get()
+    def callback3(self,*args):
+        self.options['pw'] = self.pw_var.get()
+    def callback4(self,*args):
+        self.options['db'] = self.db_var.get()
+
 
 class PreferencesContainer(tk.Frame):
     def __init__(self,parent,MainApp):
@@ -95,6 +131,10 @@ class PreferencesContainer(tk.Frame):
         ttk.Separator(self,orient=tk.HORIZONTAL).grid(row=3,column=0,sticky='ew')
         tk.Label(self,text='Template Settings',font=('Helvetica 12 bold')).grid(row=3,column=0,sticky='ns')
         TemplatePreferences(self,self.mainapp,self.options['Template']).grid(sticky='ew',row=4,column=0)
+
+        ttk.Separator(self,orient=tk.HORIZONTAL).grid(row=5,column=0,sticky='ew')
+        tk.Label(self,text='MySQL Settings',font=('Helvetica 12 bold')).grid(row=5,column=0,sticky='ns')
+        MySQLPreferences(self,self.mainapp,self.options['MySQL']).grid(sticky='ew',row=6,column=0)
 class Navbar(tk.Frame):
     def __init__(self,parent):
         tk.Frame.__init__(self,parent)
@@ -104,16 +144,16 @@ class Navbar(tk.Frame):
         ysb = ttk.Scrollbar(self, orient='vertical', command=self.tree.yview)
         xsb = ttk.Scrollbar(self, orient='horizontal', command=self.tree.xview)
         self.tree.configure(yscroll=ysb.set, xscroll=xsb.set)
-        self.tree.heading('#0', text='Signal tree', anchor='w')
+        self.tree.heading('#0', text='Signal Tree', anchor='w')
         self.tree.grid(ipadx=100,ipady=100,sticky='e')
         ysb.grid(row=0, column=1, sticky='ns')
         xsb.grid(row=1, column=0, sticky='ew')
         self.OPTIONS=['All Signals','All Controls','All Measurements','All Metering']
         self.optionvar=tk.StringVar(self)
-        self.optionvar.set(self.OPTIONS[0])
-        self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS,command=self.callback)
+        self.optionvar.set(self.OPTIONS[2])
+        self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS[-2:],command=self.callback)
         self.optionmenu.grid(row=0,column=2)
-        self.layout=Tree(GetSignals().result)
+        self.layout=Tree(GetSignals(**self.parent.customization['MySQL']).result)
         self.all_electrical=self.layout.root['All']['site']
         self.all_system=self.layout.root['All']['scs']
         self.control=self.layout.root['Control']
@@ -121,8 +161,7 @@ class Navbar(tk.Frame):
         self.meter=self.layout.root['Meter']
         self.root_iid = []
         self.tree.bind('<<TreeviewSelect>>',self.getchecked)
-        self.build_tree('', self.all_electrical,self.all_electrical.data,root=True)
-        self.build_tree('', self.all_system,self.all_system.data,root=True)
+        self.build_tree('',self.measurement,self.measurement.data,root=True)
     def getchecked(self,*args):
         self.parent.listbox.delete(0,tk.END)
         for iid in self.tree.get_checked():
@@ -152,21 +191,23 @@ class Navbar(tk.Frame):
             return
         elif self.optionvar.get() == 'All Measurements':
             if not self.parent.hidden:
-                self.parent.optionmenu_mv.place(x=65,y=145)
+                self.parent.optionmenu_mv.place(x=65,y=325)
             self.build_tree('',self.measurement,self.measurement.data,root=True)
         elif self.optionvar.get()=='All Metering':
             if not self.parent.hidden:
-                self.parent.optionmenu_mt.place(x=65,y=145)
+                self.parent.optionmenu_mt.place(x=65,y=325)
             self.build_tree('', self.meter,self.meter.data,root=True)
         
         self.parent.advanbutton['state']='normal'
     def report_change(self,report_type):
         if report_type == self.parent.reportOPTIONS[0]:
-            self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS,command=self.callback)
+            self.optionvar.set(self.OPTIONS[2])
+            self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS[-2:],command=self.callback)
         else:
             self.optionvar.set(self.OPTIONS[0])
             self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS[:-2],command=self.callback)
         self.optionmenu.grid(row=0,column=2)
+        self.callback()
 
 
 class MainApplication(tk.Canvas):
@@ -178,34 +219,38 @@ class MainApplication(tk.Canvas):
         self.menubar.add_command(label='Preferences',command=self.preferencesWindow)
         self.menubar.add_command(label='About',command=self.aboutWindow)
         self.parent.config(menu=self.menubar)
-        self.navbar=Navbar(self)
-        self.navbar.place(x=700,y=80)
+        try:
+            self.navbar=Navbar(self)
+            self.navbar.place(x=700,y=260)
+        except AccessDeniedError:
+            tk.messagebox.showerror("Access to MySQL Databse denied","Unable to connect to mysql databse with current credentials.")
+            tk.Label(self,text="Not connected to database.\nSelect 'Preferences', enter the appropriate credentials, select 'Save & Close' and restart the program.").place(x=800,y=300)
         self.create_image(0,0,image=self.photoimage,anchor='nw')
-        self.create_text(15,20,text="Time Period :",fill='white',anchor='nw',font=("Arial", 12, "bold"))
-        self.fbutton.place(x=150,y=20)
-        self.tbutton.place(x=250,y=20)
-        self.flabel.place(x=150,y=45)
-        self.fhour.place(x=155,y=70)
-        self.create_text(185,70,text=":",fill='white',anchor='nw',font=("Arial", 12, "bold"))
-        self.fmin.place(x=195,y=70)
-        self.tlabel.place(x=250,y=45)
-        self.thour.place(x=255,y=70)
-        self.create_text(285,70,text=":",fill='white',anchor='nw',font=("Arial", 12, "bold"))
-        self.tmin.place(x=295,y=70)
-        self.timezonemenu.place(x=490,y=23)
-        self.report_type_menu.place(x=350,y=23)
-        self.advanbutton.place(x=610,y=25)
-        self.create_text(15,200,text="Object Path(s): ",fill='white',anchor='nw',font=("Arial", 12, "bold"))
-        self.container.place(x=150,y=200)
+        self.create_text(15,200,text="Time Period :",fill='white',anchor='nw',font=("Arial", 12, "bold"))
+        self.fbutton.place(x=150,y=200)
+        self.tbutton.place(x=250,y=200)
+        self.flabel.place(x=150,y=225)
+        self.fhour.place(x=155,y=250)
+        self.create_text(185,250,text=":",fill='white',anchor='nw',font=("Arial", 12, "bold"))
+        self.fmin.place(x=195,y=250)
+        self.tlabel.place(x=250,y=225)
+        self.thour.place(x=255,y=250)
+        self.create_text(285,250,text=":",fill='white',anchor='nw',font=("Arial", 12, "bold"))
+        self.tmin.place(x=295,y=250)
+        self.timezonemenu.place(x=490,y=203)
+        self.report_type_menu.place(x=350,y=203)
+        self.advanbutton.place(x=610,y=205)
+        self.create_text(15,380,text="Object Path(s): ",fill='white',anchor='nw',font=("Arial", 12, "bold"))
+        self.container.place(x=150,y=380)
         self.listbox.grid()
         self.ysb.grid(row=0, column=1, sticky='ns')
-        self.template_text_box.place(x=350,y=570)
-        self.template_browse_button.place(x=1050,y=570)
-        self.template_clear_button.place(x=1200,y=570)
-        self.cbutton.place(x=150,y=560)
+        self.template_text_box.place(x=350,y=750)
+        self.template_browse_button.place(x=1050,y=750)
+        self.template_clear_button.place(x=1200,y=750)
+        self.cbutton.place(x=150,y=740)
     def extract(self):
         def thread_extract():
-            self.progress.place(x=500,y=650)
+            self.progress.place(x=500,y=830)
             self.progress.start()
             self.object_fullpaths=self.listbox.get(0,tk.END)
             if path.isfile(self.template_text_box.get('1.0',tk.END).rstrip()):
@@ -268,19 +313,21 @@ class MainApplication(tk.Canvas):
             self.progress.stop()
             self.progress.place_forget()
             self.configure_all(state='normal')
-            if found==-3:
+            if found==-4:
+                tk.messagebox.showerror("Error","Sorry,something went wrong.\n"+report.errormessage)
+            elif found==-3:
                 tk.messagebox.showerror("Error","Too much data to process. Narrow down your search criteria and try again")
             elif found==-2:
-                tk.messagebox.showerror("Error","Sorry,something went wrong.\n"+report.errormessage)
+                tk.messagebox.showerror("Permission Error","If the template file is open, close it and try again.\nTry running the programme with Admin priviliges.")
             elif found==-1:
-                tk.messagebox.showerror("Error","Close the excel file and try again.")
+                tk.messagebox.showerror("Access to MySQL Databse denied","Unable to connect to mysql databse with current credentials.")
             elif found==0:
                 tk.messagebox.showwarning("Info","No data was found for the selected signal(s).")
             elif found==1:
                 tk.messagebox.showinfo("Extraction Successful !","You can view the records in the file tables.xlsx")
                 system("start EXCEL.EXE \"{}\"".format(report.file_path))
             elif found==2:
-                tk.messagebox.showwarning("Info","Records for the following data could not be found-\n"+',\n'.join(report.not_found))
+                tk.messagebox.showwarning("Info","Records for the following data could not be found-\n"+',\n'.join(report.workbook.not_found))
                 system("start EXCEL.EXE \"{}\"".format(report.file_path))
         if not self.datetimecheck():
             tk.messagebox.showerror("Date Error","The time interval is invalid. Try Again")
@@ -312,13 +359,12 @@ class MainApplication(tk.Canvas):
         self.flabel=tk.Label(self,textvariable=self.fstr,width=10)
         self.tstr=tk.StringVar(self,self.date_format(self.tdate))
         self.tlabel=tk.Label(self,textvariable=self.tstr,width=10)
-        self.photoimage=tk.PhotoImage(file="./img/bgimage.png")
+        self.photoimage=tk.PhotoImage(file="./img/bgimage2.png")
         self.resize_dim = (1400,700)
         self.parent.geometry("{0}x{1}+0+0".format(self.parent.winfo_screenwidth(),self.parent.winfo_screenheight()))
         self.parent.title("Signal Report")
         self.advanbtn_text=tk.StringVar(self,value="Show Advanced Options")
         self.advanbutton=tk.Button(self,textvariable=self.advanbtn_text,command=self.advance)
-        self.advanbutton['state']='disabled'
         self.hidden=True
         self.fqvar=tk.StringVar(self,value='1')
         self.fqentry=tk.Entry(self,width=2,textvariable=self.fqvar)
@@ -418,7 +464,7 @@ class MainApplication(tk.Canvas):
         self.prev_report_type = self.report_type_var.get()
         self.report_type_var.trace('w',self.changeReportScreen)
         self.report_type_menu = tk.OptionMenu(self,self.report_type_var,*self.reportOPTIONS)
-        self.cbutton=tk.Button(self,text="Create Excel Report!",command=self.extract,width=20,height=2)
+        self.cbutton=tk.Button(self,text="Create Report!",command=self.extract,width=20,height=2)
         self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL,length=200,  mode='determinate')
         if not path.isdir('./Templates'):
             mkdir('./Templates')
@@ -435,9 +481,9 @@ class MainApplication(tk.Canvas):
 
         self.prev_report_type = self.reportOPTIONS[0]
     def changeToEvent(self):
-        self.create_text(150,105,text="Last",fill='white',anchor='nw',font=("Arial",12,'bold'),tag='event_text')
-        self.fqentry2.place(x=200,y=105)
-        self.event_duration_menu.place(x=225,y=100)
+        self.create_text(150,285,text="Last",fill='white',anchor='nw',font=("Arial",12,'bold'),tag='event_text')
+        self.fqentry2.place(x=200,y=285)
+        self.event_duration_menu.place(x=225,y=280)
         self.disable_advance()
         self.event_duration_var.set(self.eventdurationOPTIONS[1])
 
@@ -449,8 +495,8 @@ class MainApplication(tk.Canvas):
             self.fqentry2.place_forget()
         else:
             state='disabled'
-            self.fqentry2.place(x=200,y=105)
-            self.create_text(150,105,text="Last",fill='white',anchor='nw',font=("Arial",12,'bold'),tag='event_text')
+            self.fqentry2.place(x=200,y=285)
+            self.create_text(150,285,text="Last",fill='white',anchor='nw',font=("Arial",12,'bold'),tag='event_text')
         self.fbutton['state']=state
         self.tbutton['state']=state
         self.fhour.config(state=state)
@@ -481,10 +527,9 @@ class MainApplication(tk.Canvas):
         button2.grid(row=2,column=2)
         button3.grid(row=2,column=3)
     def aboutWindow(self):
-        self.about_message = """Version 0.15.11 
-Commit 5dc11b04af0359ed8e1aa8a868d1d03bcfa26d52
-Signal Report© (All Rights Reserved) is an open source project that was created by Farhan Ali, Arun Aery and Rahul Kumar at Schneider Eletric Dubai.
-
+        self.about_message = """Version 0.15.11\n 
+Commit babbee69f433fef81ff94e7453a5dcc3475b9377\n
+Signal Report © (All Rights Reserved) is an open source project that was created by Farhan Ali, Arun Aery and Rahul Kumar at Schneider Electric Dubai.
         """
         tk.messagebox.showinfo("About",self.about_message)
 
@@ -517,18 +562,18 @@ Signal Report© (All Rights Reserved) is an open source project that was created
     def advance(self):
         if self.hidden:
             self.advanbtn_text.set("Hide Advanced Options")
-            self.create_text(15,150,text="Show\t\t\tevery".expandtabs(11),fill='white',anchor='nw',font=("Arial",12,'bold'),tag='showtext')
+            self.create_text(15,330,text="Show\t\t\tevery".expandtabs(11),fill='white',anchor='nw',font=("Arial",12,'bold'),tag='showtext')
             if self.navbar.optionvar.get() == 'All Measurements':
-                self.optionmenu_mv.place(x=65,y=145)
+                self.optionmenu_mv.place(x=65,y=325)
             else:
-                self.optionmenu_mt.place(x=65,y=145) 
-            self.fqentry.place(x=230,y=153)
-            self.radiobutton1.place(x=260,y=150)
-            self.radiobutton2.place(x=340,y=150)
-            self.radiobutton3.place(x=415,y=150)
-            self.radiobutton4.place(x=480,y=150)
-            self.radiobutton5.place(x=540,y=150)
-            self.radiobutton6.place(x=605,y=150)
+                self.optionmenu_mt.place(x=65,y=325) 
+            self.fqentry.place(x=230,y=333)
+            self.radiobutton1.place(x=260,y=330)
+            self.radiobutton2.place(x=340,y=330)
+            self.radiobutton3.place(x=415,y=330)
+            self.radiobutton4.place(x=480,y=330)
+            self.radiobutton5.place(x=540,y=330)
+            self.radiobutton6.place(x=605,y=330)
         else:
             self.advanbtn_text.set("Show Advanced Options")
             self.delete('showtext')
