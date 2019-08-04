@@ -42,10 +42,6 @@ class SingleSheet():
             'Max',
             'Min',
         )
-        self.changes_event_fields = (
-            'Event Mess',
-            'Event Userlooked',
-        )
         self.font_head =  Font(b=True,color="4EB1BA",sz=15)
         self.alt_font_head = Font(b=True,color='FFFFFF',sz=15)
         self.align_head = Alignment(horizontal='center',vertical='center')
@@ -211,7 +207,7 @@ class MultipleSheet(SingleSheet):
         else:
             base_cell.font = self.font_head
             base_cell.fill = self.fill_head
-        fields = {4:self.changes_event_fields,6:self.changes_mv_fields,7:self.consumption_mt_fields,9:self.average_mv_fields}.get(self.step)
+        fields = {6:self.changes_mv_fields,7:self.consumption_mt_fields,9:self.average_mv_fields}.get(self.step)
         for i,head in enumerate(['Date','Time',*fields]):
             self.ws.cell(row=self.cur_row+3,column=column+i,value=head)
         for row in self.all_signal_data[index]:
@@ -351,13 +347,10 @@ class AnalogReport:
                 if not self.unparsed_data:
                     self.all_signal_data.append([])
                     continue
-                elif signal_type in ['All Measurements','All Metering']:
-                    if not hidden:
-                        self.analog_advanced()
-                    else:
-                        self.analog_raw()
+                if not hidden:
+                    self.analog_advanced()
                 else:
-                    self.event_selected()
+                    self.analog_raw()
                 self.all_signal_data.append(self.data)
             if not self.isListEmpty(self.all_signal_data):
                 if (not hidden and not self.customization['Excel'][2]):
@@ -562,18 +555,6 @@ class AnalogReport:
                         vm,vo,vq,vv
                     ),
                 )
-    def event_selected(self):
-        for dt,ms,em,eu in self.unparsed_data:
-            dt+=datetime.timedelta(milliseconds=ms)
-            eu = eu.replace('=',' / ')
-            self.data.append(
-                (
-                    str((dt+datetime.timedelta(hours=self.timezonediff)).date()),
-                    str((dt+datetime.timedelta(hours=self.timezonediff)).time()),
-                    em,eu
-                )
-            )
-
     def roundTime(self,d1,roundTo):
         seconds=(d1-d1.min).seconds
         rounding=(seconds+roundTo/2)//roundTo*roundTo
@@ -587,7 +568,7 @@ class AnalogReport:
             return all(map(self.isListEmpty,inList))
         return False
 class EventReport:
-    def __init__(self,fdate,tdate,timezone,template_path=None):
+    def __init__(self,fdate,tdate,timezone,template_path=None,object_fullpaths=None):
         try:
             # self.str_time=datetime.datetime.now().strftime('%a %d %b %y %I-%M-%S%p')
             self.str_time=datetime.datetime.now().strftime('%y%m%d%H%M%S')
@@ -608,8 +589,7 @@ class EventReport:
                     self.customization = pickle.load(file)
             else:
                 self.customization = Preferences.options_default
-
-            signal = GetSignalDataEvent(self.fdate,self.tdate,**self.customization['MySQL'])
+            signal = GetSignalDataEvent(self.fdate,self.tdate,object_fullpaths,**self.customization['MySQL'])
             self.unparsed_data = signal.result
             for dt,ms,oo,od,em,eq,eu in self.unparsed_data:
                 dt+=datetime.timedelta(milliseconds=ms)
@@ -640,10 +620,10 @@ class EventReport:
             self.result = -2
         except ExcessiveDataError:
             self.result = -3
-        except Exception as e:
-            self.result = -4
-            self.errormessage = str(e)
-            print(e)
+        # except Exception as e:
+        #     self.result = -4
+        #     self.errormessage = str(e)
+        #     print(e)
 
 if __name__ == "__main__":
 

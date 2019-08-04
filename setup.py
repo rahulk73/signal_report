@@ -44,7 +44,7 @@ bdist_msi_options = {'data':msi_data}
 
 setup(
     name = 'SignalReport',
-    version = '0.15.13',
+    version = '0.16.14',
     description = 'MVP',
     options = {'build_exe':build_exe_options,'bdist_msi':bdist_msi_options},
     executables = [Executable('main.pyw', base=base,icon="img/icon.ico")]

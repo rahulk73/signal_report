@@ -60,7 +60,7 @@ class GetSignalDataAnalog:
             self.connection.close()
 
 class GetSignalDataEvent:
-    def __init__(self,fdate,tdate,sh,un,pw,db):
+    def __init__(self,fdate,tdate,object_fullpaths,sh,un,pw,db):
         self.result=()
         try:
             self.connection=pymysql.connect(host=sh,user=un,password=pw,db=db)
@@ -69,13 +69,22 @@ class GetSignalDataEvent:
         try:
             self.result = None
             with self.connection.cursor() as cursor:
-                self.sql = """
-                SELECT e.event_datetime,e.event_millisec,o.object_origin,object_description,e.event_mess,e.event_quality,e.event_userslogged
-                FROM events as e
-                inner join objects as o
-                on o.object_uid32=e.event_object_uid32
-                where e.event_datetime between '{0}' and '{1}'
-                """.format(fdate,tdate)
+                if object_fullpaths:
+                    self.sql = """
+                    SELECT e.event_datetime,e.event_millisec,o.object_origin,object_description,e.event_mess,e.event_quality,e.event_userslogged
+                    FROM events as e
+                    inner join objects as o
+                    on o.object_uid32=e.event_object_uid32
+                    where (e.event_datetime between '{0}' and '{1}') and o.object_fullpath in """.format(fdate,tdate) + str(object_fullpaths)+' order by e.event_datetime'
+                    print(self.sql)
+                else:
+                    self.sql = """
+                    SELECT e.event_datetime,e.event_millisec,o.object_origin,object_description,e.event_mess,e.event_quality,e.event_userslogged
+                    FROM events as e
+                    inner join objects as o
+                    on o.object_uid32=e.event_object_uid32
+                    where e.event_datetime between '{0}' and '{1}'
+                    """.format(fdate,tdate)
                 cursor.execute(self.sql)
                 self.result = generator(cursor)
         except pymysql.err.ProgrammingError:
@@ -107,23 +116,56 @@ class GetSignals:
 
 
 if __name__ == "__main__":
-    #data=GetSignalData('MOSG / 11KV / K05_T40 LV INC / MEASUREMENT / VOLTAGE VYN','All Signals')
-    # data=GetSignalData('MOSG / 33KV / H32_T30 (LV) INC / BCU SYNCROCHECK / ON/OFF SPS','All Signals')
-    #data=GetSignals()
-    # data=GetSignalDataAnalog('MOSG / 33KV / H01_T40 TRF / MEASUREMENT / CURRENT IB','All Measurements',datetime.datetime(2019,7,22,8,39),datetime.datetime(2019,7,22,8,55))
-    # data=GetSignalDataAnalog('MOSG / 33KV / H12_13 BUS SEC / Q0 CB / POSITION','All Signals',datetime.datetime(2019,7,4,6,41),datetime.datetime(2019,7,4,7,0))
-    data = GetSignalDataEvent(datetime.datetime(2019,6,19,11,58),datetime.datetime(2019,6,19,12,00))
+    data = GetSignalDataAnalog(
+        'MOSG / 33KV / H01_T40 TRF / MEASUREMENT / CURRENT IB',
+        'All Measurements',
+        datetime.datetime(2019,7,22,8,39),
+        datetime.datetime(2019,7,22,8,55),
+        sh='localhost',
+        un='mcisadmin',
+        pw='s$e!P!C!L@2014',
+        db='pacis',
+    )
+
+    data = GetSignalDataAnalog(
+        'MOSG / 33KV / H12_13 BUS SEC / Q0 CB / POSITION',
+        'All Signals',
+        datetime.datetime(2019,7,4,6,41),
+        datetime.datetime(2019,7,4,7,0),
+        sh='localhost',
+        un='mcisadmin',
+        pw='s$e!P!C!L@2014',
+        db='pacis',
+    )
+    data = GetSignalDataAnalog(
+        'MOSG / 33KV / H12_13 BUS SEC / Q0 CB / POSITION',
+        'All Signals',
+        datetime.datetime(2019,7,4,6,41),
+        datetime.datetime(2019,7,4,7,0),
+        sh='localhost',
+        un='mcisadmin',
+        pw='s$e!P!C!L@2014',
+        db='pacis',
+    )
+    data = GetSignalDataEvent(
+        datetime.datetime(2019,7,3,11,58),
+        datetime.datetime(2019,8,3,12,00),
+        ('MOSG / 33KV / H06_T10 (LV) INC / GIS SIGNALS / GIS CB SPRING DISCHARGED','MOSG / 33KV / H06_T10 (LV) INC / GIS SIGNALS / GIS DC SUPPLY FAIL'),
+        sh='localhost',
+        un='mcisadmin',
+        pw='s$e!P!C!L@2014'
+        ,db='pacis'
+    )
+    data = GetSignalDataEvent(
+        datetime.datetime(2019,7,3,11,58),
+        datetime.datetime(2019,8,3,12,00),
+        (),
+        sh='localhost',
+        un='mcisadmin',
+        pw='s$e!P!C!L@2014'
+        ,db='pacis'
+    )
     print(data.result)
     print(type(data.result))
     print(next(data.result))
-    # f = open('output.txt','w')
-    # try:
-    #     while True:
-    #         f.write(str(next(data.result))+'\n')
-    # except StopIteration:
-    #     print('stopped')
-    # except TypeError:
-    #     print('Result is empty')
-    # finally:
-    #     f.close()
         

@@ -136,24 +136,28 @@ class PreferencesContainer(tk.Frame):
         tk.Label(self,text='MySQL Settings',font=('Helvetica 12 bold')).grid(row=5,column=0,sticky='ns')
         MySQLPreferences(self,self.mainapp,self.options['MySQL']).grid(sticky='ew',row=6,column=0)
 class Navbar(tk.Frame):
-    def __init__(self,parent):
+    def __init__(self,parent,app):
         tk.Frame.__init__(self,parent)
+        self.app = app
         self.parent=parent
         self.internal_nodes = dict()
+        self.rowconfigure(0,weight=1)
+        self.columnconfigure(2,weight=1)
+        self.columnconfigure(0,weight=3)
         self.tree = CheckboxTreeview(self)
         ysb = ttk.Scrollbar(self, orient='vertical', command=self.tree.yview)
         xsb = ttk.Scrollbar(self, orient='horizontal', command=self.tree.xview)
         self.tree.configure(yscroll=ysb.set, xscroll=xsb.set)
         self.tree.heading('#0', text='Signal Tree', anchor='w')
-        self.tree.grid(ipadx=100,ipady=100,sticky='e')
+        self.tree.grid(ipadx=100,ipady=100,sticky='nse')
         ysb.grid(row=0, column=1, sticky='ns')
         xsb.grid(row=1, column=0, sticky='ew')
         self.OPTIONS=['All Signals','All Controls','All Measurements','All Metering']
         self.optionvar=tk.StringVar(self)
         self.optionvar.set(self.OPTIONS[2])
         self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS[-2:],command=self.callback)
-        self.optionmenu.grid(row=0,column=2)
-        self.layout=Tree(GetSignals(**self.parent.customization['MySQL']).result)
+        self.optionmenu.grid(row=0,column=2,sticky='ew')
+        self.layout=Tree(GetSignals(**self.app.customization['MySQL']).result)
         self.all_electrical=self.layout.root['All']['site']
         self.all_system=self.layout.root['All']['scs']
         self.control=self.layout.root['Control']
@@ -163,10 +167,10 @@ class Navbar(tk.Frame):
         self.tree.bind('<<TreeviewSelect>>',self.getchecked)
         self.build_tree('',self.measurement,self.measurement.data,root=True)
     def getchecked(self,*args):
-        self.parent.listbox.delete(0,tk.END)
+        self.app.listbox.delete(0,tk.END)
         for iid in self.tree.get_checked():
             if not self.tree.get_children(iid):
-                self.parent.listbox.insert(tk.END,self.tree.item(iid,'values')[0])
+                self.app.listbox.insert(tk.END,self.tree.item(iid,'values')[0])
     def build_tree(self,parent_iid,node,data,root=False):
         node_iid=self.tree.insert(parent_iid,"end",text=data)
         if not node.isInternalNode():
@@ -177,12 +181,12 @@ class Navbar(tk.Frame):
             self.build_tree(node_iid,child,child.data)
     def callback(self,*args):
         self.tree.delete(*self.root_iid)
-        self.parent.listbox.delete(0,tk.END)
+        self.app.listbox.delete(0,tk.END)
         self.root_iid=[]
-        self.parent.optionmenu_mt.place_forget()
-        self.parent.optionmenu_mv.place_forget()
+        self.app.optionmenu_mt.grid_forget()
+        self.app.optionmenu_mv.grid_forget()
         if self.optionvar.get() in self.OPTIONS[:-2]:
-            self.parent.disable_advance()
+            self.app.disable_advance()
             if self.optionvar.get() == 'All Controls':
                 self.build_tree('', self.control,self.control.data,root=True)
             elif self.optionvar.get() == 'All Signals':
@@ -190,74 +194,77 @@ class Navbar(tk.Frame):
                 self.build_tree('', self.all_system,self.all_system.data,root=True)
             return
         elif self.optionvar.get() == 'All Measurements':
-            if not self.parent.hidden:
-                self.parent.optionmenu_mv.place(x=65,y=325)
+            if not self.app.hidden:
+                self.app.optionmenu_mv.grid(row=0,column=1,sticky='ew',padx=5)
             self.build_tree('',self.measurement,self.measurement.data,root=True)
         elif self.optionvar.get()=='All Metering':
-            if not self.parent.hidden:
-                self.parent.optionmenu_mt.place(x=65,y=325)
+            if not self.app.hidden:
+                self.app.optionmenu_mt.grid(row=0,column=1,sticky='ew',padx=5)
             self.build_tree('', self.meter,self.meter.data,root=True)
         
-        self.parent.advanbutton['state']='normal'
+        self.app.advanbutton['state']='normal'
     def report_change(self,report_type):
-        if report_type == self.parent.reportOPTIONS[0]:
+        if report_type == self.app.reportOPTIONS[0]:
             self.optionvar.set(self.OPTIONS[2])
             self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS[-2:],command=self.callback)
         else:
             self.optionvar.set(self.OPTIONS[0])
             self.optionmenu=tk.OptionMenu(self,self.optionvar,*self.OPTIONS[:-2],command=self.callback)
-        self.optionmenu.grid(row=0,column=2)
+        self.optionmenu.grid(row=0,column=2,sticky='ew')
         self.callback()
 
 
-class MainApplication(tk.Canvas):
+class MainApplication(tk.Frame):
     def __init__(self,parent):
-        tk.Canvas.__init__(self,parent)
+        tk.Frame.__init__(self,parent,bg="#0D3D56")
         self.parent=parent
         self.setup()
         self.menubar = tk.Menu(self.parent)
         self.menubar.add_command(label='Preferences',command=self.preferencesWindow)
         self.menubar.add_command(label='About',command=self.aboutWindow)
         self.parent.config(menu=self.menubar)
+
+        tk.Label(self.left_top_frame,text='Time Period :',font=("Arial", 12, "bold"),bg=self.colour_code,fg='white').grid(row=0,column=0)
+        self.fbutton.grid(row=0,column=1,padx=10,columnspan=3)
+        self.flabel.grid(row=1,column=1,columnspan=3)
+        self.fhour.grid(row=2,column=1,pady=5)
+        tk.Label(self.left_top_frame,text=':',font=("Arial", 12, "bold"),bg=self.colour_code,fg='white').grid(row=2,column=2)
+        self.fmin.grid(row=2,column=3)
+
+        self.tbutton.grid(row=0,column=4,padx=10,columnspan=3)
+        self.tlabel.grid(row=1,column=4,columnspan=3)
+        self.thour.grid(row=2,column=4,pady=5)
+        tk.Label(self.left_top_frame,text=':',font=("Arial", 12, "bold"),bg=self.colour_code,fg='white').grid(row=2,column=5)
+        self.tmin.grid(row=2,column=6)
+        self.report_type_menu.grid(row=0,column=1,padx=10)
+        self.timezonemenu.grid(row=0,column=2,padx=10)
+        self.advanbutton.grid(row=0,column=3,padx=10)
+
+        tk.Label(self.middle_frame,text='Object Path(s): ',font=("Arial", 12, "bold"),bg=self.colour_code,fg='white').grid(row=0,column=0,sticky='nw')
         try:
-            self.navbar=Navbar(self)
-            self.navbar.place(x=700,y=260)
+            self.navbar=Navbar(self.middle_frame,self)
+            self.navbar.grid(row=0,column=2,rowspan=2,sticky='nsw',padx=20)
         except AccessDeniedError:
             tk.messagebox.showerror("Access to MySQL Databse denied","Unable to connect to mysql databse with current credentials.")
-            tk.Label(self,text="Not connected to database.\nSelect 'Preferences', enter the appropriate credentials, select 'Save & Close' and restart the program.").place(x=800,y=300)
-        self.create_image(0,0,image=self.photoimage,anchor='nw')
-        self.create_text(15,200,text="Time Period :",fill='white',anchor='nw',font=("Arial", 12, "bold"))
-        self.fbutton.place(x=150,y=200)
-        self.tbutton.place(x=250,y=200)
-        self.flabel.place(x=150,y=225)
-        self.fhour.place(x=155,y=250)
-        self.create_text(185,250,text=":",fill='white',anchor='nw',font=("Arial", 12, "bold"))
-        self.fmin.place(x=195,y=250)
-        self.tlabel.place(x=250,y=225)
-        self.thour.place(x=255,y=250)
-        self.create_text(285,250,text=":",fill='white',anchor='nw',font=("Arial", 12, "bold"))
-        self.tmin.place(x=295,y=250)
-        self.timezonemenu.place(x=490,y=203)
-        self.report_type_menu.place(x=350,y=203)
-        self.advanbutton.place(x=610,y=205)
-        self.create_text(15,380,text="Object Path(s): ",fill='white',anchor='nw',font=("Arial", 12, "bold"))
-        self.container.place(x=150,y=380)
-        self.listbox.grid()
+            tk.Label(self.middle_frame,text="Not connected to database.\nSelect 'Preferences', enter the appropriate credentials, select 'Save & Close' and restart the program.").grid(row=0,column=2,rowspan=2,sticky='new',padx=20)
+        self.container.grid(row=0,column=1,sticky='nw')
+        self.listbox.grid(sticky='nsew')
         self.ysb.grid(row=0, column=1, sticky='ns')
-        self.template_text_box.place(x=350,y=750)
-        self.template_browse_button.place(x=1050,y=750)
-        self.template_clear_button.place(x=1200,y=750)
-        self.cbutton.place(x=150,y=740)
+
+        self.cbutton.pack(side=tk.LEFT,fill='x',expand=True,padx=10)
+        self.template_text_box.pack(side=tk.LEFT,fill='x',expand=True)
+        self.template_browse_button.pack(side=tk.LEFT,fill='x',expand=True,padx=10)
+        self.template_clear_button.pack(side=tk.LEFT,fill='x',expand=True,padx=10)
     def extract(self):
         def thread_extract():
-            self.progress.place(x=500,y=830)
+            self.progress.grid(row=4,column=0,sticky='ew',columnspan=2)
             self.progress.start()
             self.object_fullpaths=self.listbox.get(0,tk.END)
             if path.isfile(self.template_text_box.get('1.0',tk.END).rstrip()):
                 self.template_path = self.template_text_box.get('1.0',tk.END).rstrip()
             else:
                 self.template_path = None
-            if self.report_type_var.get() == self.reportOPTIONS[1] and len(self.object_fullpaths)<1:
+            if self.report_type_var.get() == self.reportOPTIONS[1]:
                 if self.event_duration_var.get() != self.eventdurationOPTIONS[-1]:
                     time_unit = dict(zip(self.eventdurationOPTIONS[:-1],[
                         60,
@@ -273,12 +280,26 @@ class MainApplication(tk.Canvas):
                 else:
                     fdate = datetime.datetime(self.fdate.year,self.fdate.month,self.fdate.day,int(self.fhour.get()),int(self.fmin.get()))
                     tdate =  datetime.datetime(self.tdate.year,self.tdate.month,self.tdate.day,int(self.thour.get()),int(self.tmin.get()))
-                report = EventReport(
-                    fdate,
-                    tdate,
-                    self.timezonevar.get(),
-                    self.template_path,
-                )
+                if self.event_signal_var.get() == self.eventsignalsOPTIONS[1]:
+                    if len(self.object_fullpaths)>0:
+                        report = EventReport(
+                            fdate,
+                            tdate,
+                            self.timezonevar.get(),
+                            self.template_path,
+                            self.object_fullpaths,
+                        )
+                    else:
+                        class Dummy:
+                            result = 0
+                        report = Dummy()
+                else:
+                    report = EventReport(
+                        fdate,
+                        tdate,
+                        self.timezonevar.get(),
+                        self.template_path,
+                    )
 
 
             elif self.hidden:
@@ -311,7 +332,7 @@ class MainApplication(tk.Canvas):
 
             found=report.result       
             self.progress.stop()
-            self.progress.place_forget()
+            self.progress.grid_forget()
             self.configure_all(state='normal')
             if found==-4:
                 tk.messagebox.showerror("Error","Sorry,something went wrong.\n"+report.errormessage)
@@ -336,16 +357,49 @@ class MainApplication(tk.Canvas):
         threading.Thread(target=thread_extract).start()
         
     def setup(self):
+        self.colour_code = '#0D3D56'
+        self.grid_columnconfigure(0,weight=1)
+        self.grid_rowconfigure(2,weight=1)
+        self.photoimage_logo=tk.PhotoImage(file="./img/logo.png")
+        self.logo = tk.Label(self,image=self.photoimage_logo,height=94)
+        self.logo.grid(row=0,column=1,sticky='e')
+        self.header_label = tk.Label(self,height=2,bg='#EBC944',fg='#0D3D56',text='SIGNAL REPORT',font=('Arial',30,'bold'))
+        self.header_label.grid(row=0,column=0,sticky='ew')
+
+        self.top_frame = tk.Frame(self,bg=self.colour_code)
+        self.top_frame.grid(row=1,column=0,sticky='new',columnspan=2)
+        self.top_frame.grid_columnconfigure(1,weight=1)
+        self.top_frame.grid_columnconfigure(2,weight=1)
+
+
+        self.left_top_frame = tk.Frame(self.top_frame,bg=self.colour_code)
+        self.left_top_frame.grid(row=0,column=1,sticky='nw')
+        self.right_top_frame = tk.Frame(self.top_frame,bg=self.colour_code)
+        self.right_top_frame.grid(row=0,column=2,sticky='nw')
+
+        self.advanced_frame = tk.Frame(self.top_frame,bg=self.colour_code)
+        self.event_frame = tk.Frame(self.top_frame,bg=self.colour_code)
+
+
+        self.middle_frame = tk.Frame(self,bg=self.colour_code)
+        self.middle_frame.grid(row=2,column=0,sticky='nsew',columnspan=2)
+        self.middle_frame.grid_columnconfigure(1,weight=1)
+        self.middle_frame.grid_columnconfigure(2,weight=1)
+        self.middle_frame.rowconfigure(0,weight=1)
+
+        self.bottom_frame = tk.Frame(self,bg=self.colour_code)
+        self.bottom_frame.grid(row=3,column=0,columnspan=2,sticky='ew')
+
         self.to_datetime = datetime.datetime.now()
         self.from_datetime = self.to_datetime +datetime.timedelta(hours=-1)
         self.tdate = datetime.date(self.to_datetime.year,self.to_datetime.month,self.to_datetime.day)
         self.fdate = datetime.date(self.from_datetime.year,self.from_datetime.month,self.from_datetime.day)
-        self.fbutton=ttk.Button(self, text='From', command=self.fgetdate,underline=1)
+        self.fbutton=ttk.Button(self.left_top_frame, text='From', command=self.fgetdate,underline=1)
         vcmd = (self.register(self.onValidate),'%P','%W')
-        self.fhour = tk.Spinbox(self,from_=0,to=23,wrap=True,width=2,validatecommand=vcmd,validate='key',name='from_hour')
-        self.fmin = tk.Spinbox(self,from_=0,to=59,wrap=True,width=2,validatecommand=vcmd,validate='key',name='from_min')
-        self.thour = tk.Spinbox(self,from_=0,to=23,wrap=True,width=2,validatecommand=vcmd,validate='key',name='to_hour')
-        self.tmin = tk.Spinbox(self,from_=0,to=59,wrap=True,width=2,validatecommand=vcmd,validate='key',name='to_min')
+        self.fhour = tk.Spinbox(self.left_top_frame,from_=0,to=23,wrap=True,width=2,validatecommand=vcmd,validate='key',name='from_hour')
+        self.fmin = tk.Spinbox(self.left_top_frame,from_=0,to=59,wrap=True,width=2,validatecommand=vcmd,validate='key',name='from_min')
+        self.thour = tk.Spinbox(self.left_top_frame,from_=0,to=23,wrap=True,width=2,validatecommand=vcmd,validate='key',name='to_hour')
+        self.tmin = tk.Spinbox(self.left_top_frame,from_=0,to=59,wrap=True,width=2,validatecommand=vcmd,validate='key',name='to_min')
         self.fhour.delete(0,'end')
         self.fhour.insert(0,self.from_datetime.hour)
         self.fmin.delete(0,'end')
@@ -354,47 +408,60 @@ class MainApplication(tk.Canvas):
         self.thour.insert(0,self.to_datetime.hour)
         self.tmin.delete(0,'end')
         self.tmin.insert(0,self.to_datetime.minute)
-        self.tbutton=ttk.Button(self, text='To', command=self.tgetdate)
+        self.tbutton=ttk.Button(self.left_top_frame, text='To', command=self.tgetdate)
         self.fstr=tk.StringVar(self,self.date_format(self.fdate))
-        self.flabel=tk.Label(self,textvariable=self.fstr,width=10)
+        self.flabel=tk.Label(self.left_top_frame,textvariable=self.fstr,width=10)
         self.tstr=tk.StringVar(self,self.date_format(self.tdate))
-        self.tlabel=tk.Label(self,textvariable=self.tstr,width=10)
-        self.photoimage=tk.PhotoImage(file="./img/bgimage2.png")
-        self.resize_dim = (1400,700)
-        self.parent.geometry("{0}x{1}+0+0".format(self.parent.winfo_screenwidth(),self.parent.winfo_screenheight()))
+        self.tlabel=tk.Label(self.left_top_frame,textvariable=self.tstr,width=10)
         self.parent.title("Signal Report")
         self.advanbtn_text=tk.StringVar(self,value="Show Advanced Options")
-        self.advanbutton=tk.Button(self,textvariable=self.advanbtn_text,command=self.advance)
+        self.advanbutton=tk.Button(self.right_top_frame,textvariable=self.advanbtn_text,command=self.advance,relief=tk.RAISED)
         self.hidden=True
         self.fqvar=tk.StringVar(self,value='1')
-        self.fqentry=tk.Entry(self,width=2,textvariable=self.fqvar)
+        self.fqentry=tk.Entry(self.advanced_frame,width=2,textvariable=self.fqvar)
         self.reg1=self.register(self.freq_valid)
+        self.show_label = tk.Label(self.advanced_frame,text="Show",fg='white',bg=self.colour_code,font=("Arial",12,'bold'))
+        self.every_label = tk.Label(self.advanced_frame,text="every",fg='white',bg=self.colour_code,font=("Arial",12,'bold'))
+        self.last_label = tk.Label(self.event_frame,text="last",fg='white',bg=self.colour_code,font=("Arial",12,'bold'))
+        self.in_label = tk.Label(self.event_frame,text="in",fg='white',bg=self.colour_code,font=("Arial",12,'bold'))
         self.fqentry.config(validate='key',validatecommand=(self.reg1,'%P'))
         self.fqentry.bind('<FocusOut>',self.freq_focusout)
         self.fqvar2=tk.StringVar(self,value='1')
-        self.fqentry2=tk.Entry(self,width=2,textvariable=self.fqvar)
+        self.fqentry2=tk.Entry(self.event_frame,width=2,textvariable=self.fqvar)
         self.reg1=self.register(self.freq_valid)
         self.fqentry2.config(validate='key',validatecommand=(self.reg1,'%P'))
         self.fqentry2.bind('<FocusOut>',self.freq_focusout)
         self.radb=tk.IntVar(self,2)
-        self.radiobutton1=tk.Radiobutton(self,text="Second(s)",value=1,variable=self.radb)
-        self.radiobutton2=tk.Radiobutton(self,text="Minute(s)",value=2,variable=self.radb)
-        self.radiobutton3=tk.Radiobutton(self,text="Hour(s)",value=3,variable=self.radb)
-        self.radiobutton4=tk.Radiobutton(self,text="Day(s)",value=4,variable=self.radb)
-        self.radiobutton5=tk.Radiobutton(self,text="Week(s)",value=5,variable=self.radb)
-        self.radiobutton6=tk.Radiobutton(self,text="Month(s)",value=6,variable=self.radb)
+        self.radiobutton1=tk.Radiobutton(self.advanced_frame,text="Second(s)",value=1,variable=self.radb)
+        self.radiobutton2=tk.Radiobutton(self.advanced_frame,text="Minute(s)",value=2,variable=self.radb)
+        self.radiobutton3=tk.Radiobutton(self.advanced_frame,text="Hour(s)",value=3,variable=self.radb)
+        self.radiobutton4=tk.Radiobutton(self.advanced_frame,text="Day(s)",value=4,variable=self.radb)
+        self.radiobutton5=tk.Radiobutton(self.advanced_frame,text="Week(s)",value=5,variable=self.radb)
+        self.radiobutton6=tk.Radiobutton(self.advanced_frame,text="Month(s)",value=6,variable=self.radb)
         self.OPTIONS_MEASUREMENT=['Changes','Average']
         self.OPTIONS_METERING = ['Changes','Consumption']
         self.optionvar_mv=tk.StringVar(self)
         self.optionvar_mv.set(self.OPTIONS_MEASUREMENT[0])
-        self.optionmenu_mv=tk.OptionMenu(self,self.optionvar_mv,*self.OPTIONS_MEASUREMENT)
+        self.optionmenu_mv=tk.OptionMenu(self.advanced_frame,self.optionvar_mv,*self.OPTIONS_MEASUREMENT)
         self.optionmenu_mv.config(width=10)
         self.optionvar_mt = tk.StringVar(self)
         self.optionvar_mt.set(self.OPTIONS_METERING[0])
-        self.optionmenu_mt =tk.OptionMenu(self,self.optionvar_mt,*self.OPTIONS_METERING)
+        self.optionmenu_mt =tk.OptionMenu(self.advanced_frame,self.optionvar_mt,*self.OPTIONS_METERING)
         self.optionmenu_mt.config(width=10)
-        self.container = tk.Frame(self)
-        self.listbox = tk.Listbox(self.container,width=85,height=20)
+
+        self.show_label.grid(row=0,column=0,sticky='ew')
+        self.optionmenu_mv.grid(row=0,column=1,sticky='ew',padx=5)
+        self.every_label.grid(row=0,column=2,sticky='ew')
+        self.fqentry.grid(row=0,column=3,sticky='ew',padx=5)
+        self.radiobutton1.grid(row=0,column=4,sticky='ew')
+        self.radiobutton2.grid(row=0,column=5,sticky='ew')
+        self.radiobutton3.grid(row=0,column=6,sticky='ew')
+        self.radiobutton4.grid(row=0,column=7,sticky='ew')
+        self.radiobutton5.grid(row=0,column=8,sticky='ew')
+        self.radiobutton6.grid(row=0,column=9,sticky='ew')
+
+        self.container = tk.Frame(self.middle_frame)
+        self.listbox = tk.Listbox(self.container,width=85,height=10)
         self.ysb = ttk.Scrollbar(self.container, orient='vertical',command=self.listbox.yview)
         self.listbox.config(yscroll=self.ysb.set)
         self.timezoneOPTIONS = (
@@ -429,9 +496,9 @@ class MainApplication(tk.Canvas):
         else:
             self.customization = Preferences.options_default
         self.timezonevar = tk.StringVar(self,value='GMT+4:00')
-        self.timezonemenu = tk.OptionMenu(self,self.timezonevar,*self.timezoneOPTIONS)
+        self.timezonemenu = tk.OptionMenu(self.right_top_frame,self.timezonevar,*self.timezoneOPTIONS)
         self.template_dir_path = 'Templates'
-        self.template_text_box = tk.Text(self,width=75,height=1,font=('Helvetica',12,))
+        self.template_text_box = tk.Text(self.bottom_frame,width=75,height=1,font=('Helvetica',12,))
         self.template_text_box.tag_config('format1',justify='center')
         self.template_text_box.tag_config('format2',foreground='grey')
         if self.customization['Template'][1]:
@@ -441,8 +508,8 @@ class MainApplication(tk.Canvas):
             self.template_text_box.insert('end','Select excel template for report (optional).')
             self.template_text_box.tag_add('format2','1.0',tk.END)
         self.template_text_box['state']='disabled'
-        self.template_browse_button = tk.Button(self,text='Browse',command=self.file_explore,width=20,height=1)
-        self.template_clear_button = tk.Button(self,text='Clear',command=self.clear_template_path,width=20,height=1)
+        self.template_browse_button = tk.Button(self.bottom_frame,text='Browse',command=self.file_explore,width=20,height=1)
+        self.template_clear_button = tk.Button(self.bottom_frame,text='Clear',command=self.clear_template_path,width=20,height=1)
         self.reportOPTIONS = (
             'Analog Report',
             'Event Report',
@@ -456,15 +523,30 @@ class MainApplication(tk.Canvas):
             'Year(s)',
             'Custom',
         )
+        self.eventsignalsOPTIONS = (
+            'All Available Signals',
+            'Selected',
+        )
+        self.event_signal_var = tk.StringVar(self,value=self.eventsignalsOPTIONS[0])
+        self.event_signal_var.trace('w',self.eventSignalCallback)
+        self.event_signal_menu = tk.OptionMenu(self.event_frame,self.event_signal_var,*self.eventsignalsOPTIONS)
+
         self.event_duration_var = tk.StringVar(self,value=self.eventdurationOPTIONS[1])
         self.event_duration_var.trace('w',self.eventDurationCallback)
-        self.event_duration_menu = tk.OptionMenu(self,self.event_duration_var,*self.eventdurationOPTIONS)
+        self.event_duration_menu = tk.OptionMenu(self.event_frame,self.event_duration_var,*self.eventdurationOPTIONS)
         self.event_duration_menu.config(width=10)
         self.report_type_var = tk.StringVar(self,value=self.reportOPTIONS[0])
         self.prev_report_type = self.report_type_var.get()
         self.report_type_var.trace('w',self.changeReportScreen)
-        self.report_type_menu = tk.OptionMenu(self,self.report_type_var,*self.reportOPTIONS)
-        self.cbutton=tk.Button(self,text="Create Report!",command=self.extract,width=20,height=2)
+        self.report_type_menu = tk.OptionMenu(self.right_top_frame,self.report_type_var,*self.reportOPTIONS)
+
+        self.event_signal_menu.grid(row=0,column=1,sticky='ew',padx=5)
+        self.in_label.grid(row=0,column=2,sticky='ew')
+        self.last_label.grid(row=0,column=3,sticky='ew')
+        self.fqentry2.grid(row=0,column=4,sticky='ew',padx=5)
+        self.event_duration_menu.grid(row=0,column=5,sticky='ew',padx=5)
+
+        self.cbutton=tk.Button(self.bottom_frame,text="Create Report!",command=self.extract,width=20,height=2)
         self.progress = ttk.Progressbar(self, orient=tk.HORIZONTAL,length=200,  mode='determinate')
         if not path.isdir('./Templates'):
             mkdir('./Templates')
@@ -473,38 +555,42 @@ class MainApplication(tk.Canvas):
             return
         {self.reportOPTIONS[0]:self.changeToEvent,self.reportOPTIONS[1]:self.changeToAnalog}.get(self.prev_report_type)()
         self.navbar.report_change(self.report_type_var.get())
+        i = {self.reportOPTIONS[0]:1,self.reportOPTIONS[1]:0}.get(self.prev_report_type)
+        self.event_signal_var.set(self.eventsignalsOPTIONS[i])
     def changeToAnalog(self):
-        self.delete('event_text')
-        self.fqentry2.place_forget()
-        self.event_duration_menu.place_forget()
+        self.event_frame.grid_forget()
         self.event_duration_var.set(self.eventdurationOPTIONS[-1])
 
         self.prev_report_type = self.reportOPTIONS[0]
     def changeToEvent(self):
-        self.create_text(150,285,text="Last",fill='white',anchor='nw',font=("Arial",12,'bold'),tag='event_text')
-        self.fqentry2.place(x=200,y=285)
-        self.event_duration_menu.place(x=225,y=280)
         self.disable_advance()
+        self.advanbutton['state']='disabled'
+        self.event_frame.grid(row=1,column=1,columnspan=2,sticky='sew')
         self.event_duration_var.set(self.eventdurationOPTIONS[1])
 
         self.prev_report_type = self.reportOPTIONS[1]
     def eventDurationCallback(self,*args):
         if self.event_duration_var.get() == self.eventdurationOPTIONS[-1]:
             state = 'normal'
-            self.delete('event_text')
-            self.fqentry2.place_forget()
+            self.last_label.grid_forget()
+            self.fqentry2.grid_forget()
         else:
             state='disabled'
-            self.fqentry2.place(x=200,y=285)
-            self.create_text(150,285,text="Last",fill='white',anchor='nw',font=("Arial",12,'bold'),tag='event_text')
+            self.last_label.grid(row=0,column=3,sticky='ew')
+            self.fqentry2.grid(row=0,column=4,sticky='ew')
         self.fbutton['state']=state
         self.tbutton['state']=state
         self.fhour.config(state=state)
         self.thour.config(state=state)
         self.fmin.config(state=state)
         self.tmin.config(state=state)
-        
-
+    def eventSignalCallback(self,*args):
+        if self.event_signal_var.get()==self.eventsignalsOPTIONS[0]:
+            state=('disabled','none')
+        else:
+            state=('normal','extended')
+        self.navbar.optionmenu['state']=state[0]
+        self.navbar.tree.config(selectmode=state[1])
     def preferencesWindow(self):
         def save_quit():
             self.customization = pref.options
@@ -527,8 +613,8 @@ class MainApplication(tk.Canvas):
         button2.grid(row=2,column=2)
         button3.grid(row=2,column=3)
     def aboutWindow(self):
-        self.about_message = """Version 0.15.11\n 
-Commit babbee69f433fef81ff94e7453a5dcc3475b9377\n
+        self.about_message = """Version 0.16.14\n 
+Commit 5e0f948d86f829ef5dc5c86e5d2ca674395c7432\n
 Signal Report © (All Rights Reserved) is an open source project that was created by Farhan Ali, Arun Aery and Rahul Kumar at Schneider Electric Dubai.
         """
         tk.messagebox.showinfo("About",self.about_message)
@@ -562,46 +648,15 @@ Signal Report © (All Rights Reserved) is an open source project that was create
     def advance(self):
         if self.hidden:
             self.advanbtn_text.set("Hide Advanced Options")
-            self.create_text(15,330,text="Show\t\t\tevery".expandtabs(11),fill='white',anchor='nw',font=("Arial",12,'bold'),tag='showtext')
-            if self.navbar.optionvar.get() == 'All Measurements':
-                self.optionmenu_mv.place(x=65,y=325)
-            else:
-                self.optionmenu_mt.place(x=65,y=325) 
-            self.fqentry.place(x=230,y=333)
-            self.radiobutton1.place(x=260,y=330)
-            self.radiobutton2.place(x=340,y=330)
-            self.radiobutton3.place(x=415,y=330)
-            self.radiobutton4.place(x=480,y=330)
-            self.radiobutton5.place(x=540,y=330)
-            self.radiobutton6.place(x=605,y=330)
+            self.advanced_frame.grid(row=1,column=1,columnspan=2,sticky='sew')
         else:
-            self.advanbtn_text.set("Show Advanced Options")
-            self.delete('showtext')
-            self.fqentry.place_forget()
-            self.radiobutton1.place_forget()
-            self.radiobutton2.place_forget()
-            self.radiobutton3.place_forget()
-            self.radiobutton4.place_forget()
-            self.radiobutton5.place_forget()
-            self.radiobutton6.place_forget()
-            self.optionmenu_mv.place_forget()
-            self.optionmenu_mt.place_forget()
+            self.advanced_frame.grid_forget()
         self.hidden = not self.hidden
     def disable_advance(self):
+        self.advanced_frame.grid_forget()
+        self.hidden = True
         self.advanbutton['state']='disabled'
-        if not self.hidden:
-            self.advanbtn_text.set("Show Advanced Options")
-            self.delete('showtext')
-            self.fqentry.place_forget()
-            self.radiobutton1.place_forget()
-            self.radiobutton2.place_forget()
-            self.radiobutton3.place_forget()
-            self.radiobutton4.place_forget()
-            self.radiobutton5.place_forget()
-            self.radiobutton6.place_forget()
-            self.optionmenu_mv.place_forget()
-            self.optionmenu_mt.place_forget()
-            self.hidden=True 
+        self.advanbtn_text.set("Show Advanced Options")
     def datetimecheck(self):
         if self.fhour.get() and self.fmin.get() and self.thour.get() and self.tmin.get():
             return (datetime.datetime.combine(self.fdate,datetime.time(hour=int(self.fhour.get()),minute=int(self.fmin.get())))

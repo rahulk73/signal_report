@@ -2,6 +2,14 @@
 All notable changes (Added features,depracated features,removed features,changed functionalities and bug fixes) will be documented in this file.
 
 ##[Unreleased]
+## [0.16.14]
+##Added
+-Optionmenu for selected/all events.
+
+##Changed
+-Alogorithm for selected signals, incorprated in mysql querry.
+-GUI layout to support all screens using pack/grid.
+
 ## [0.15.13] 2019-08-01
 ##Added
 -Preference support for mysql credentials.

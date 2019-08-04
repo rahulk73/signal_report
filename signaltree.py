@@ -34,10 +34,10 @@ class Tree:
                     next_parent=next_parent.findChild(node_val)
             next_parent.absolute_path=absolute_path
 
-        self.control = frozenset(['modulespc','switch_dpc','cs_ctrlonoff_spc','moduledpc'])
+        self.control = frozenset(['modulespc','switch_dpc','cs_ctrlonoff_spc','moduledpc','lockmodule_spc','modulesetpoint'])
         self.allsignals = frozenset(['mappingsps','cs_voltageabsence_sps','cs_authostate_sps','cs_onoff_sps','cs_voltagerefpresence_sp','computedswitchpos_dps',
         'cs_busbarvchoice_sps','cs_acceptforcing_sps','groupsps','tapfct','cs_voltagepresence_sps','cs_closeorderstate_sps','userfunctionsps',
-        'cs_voltagerefabsence_sps','moduledps','modulesps'])
+        'cs_voltagerefabsence_sps','moduledps','modulesps','switchpos','dps','lockmodule','mappingsps','mps','switchpos_pha','switchpos_phb','switchpos_phc'])
         self.measurement = frozenset(['modulemv'])
         self.meter = frozenset(['modulecounter'])
         self.root={'All':{'site':Node('Electrical'),'scs':Node('System')}, 'Control':Node('Electrical-Control'), 'Measurement':Node('Electrical-Measurement'),
@@ -55,6 +55,11 @@ class Tree:
     def getRoot(self):
         return self.root
 if __name__ == "__main__":
-    signals=GetSignals()
+    signals=GetSignals(
+        sh='localhost',
+        un='mcisadmin',
+        pw='s$e!P!C!L@2014'
+        ,db='pacis'
+    )
     tree=Tree(signals.result)
     print(tree.getRoot()['Meter'].isInternalNode())
