@@ -1,5 +1,6 @@
 test.py
 SignalLog/
+.DS_Store
 icon.ico
 bgimage.png
 Old/
@@ -8,3 +9,7 @@ Templates/
 img/
 build/
 dist/
+.vs/ProjectSettings.json
+.vs/VSWorkspaceState.json
+.vscode/launch.json
+.vscode/settings.json
